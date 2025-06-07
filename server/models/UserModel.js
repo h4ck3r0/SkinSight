@@ -46,8 +46,6 @@ const UserSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Ensure the phone index is not unique
-UserSchema.index({ phone: 1 }, { unique: false, sparse: true });
 
 const UserModel = mongoose.model("User", UserSchema);
 
