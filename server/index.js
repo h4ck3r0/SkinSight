@@ -51,8 +51,6 @@ app.use('/api/doctors',middleware,doctorRoutes);
 app.use('/api/appointments',middleware,appointmentRoutes);
 app.use("/api/queue",middleware,QueueRoutes);
 
-SetupSocket(server);
-
 app.get("/",(req,res)=>{
     res.send("I will show these mfs who i am ");
 })
@@ -71,7 +69,9 @@ app.use((err, req, res, next) => {
     });
 });
 
-const server=http.createServer(app);
+const server = http.createServer(app);
+SetupSocket(server);
+
 server.listen(PORT,async ()=>{
     try{
        await ConnectDb();
