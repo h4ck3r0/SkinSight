@@ -15,7 +15,7 @@ async function SetupSocket(server){
                socket.user=payload;
                next();
           }catch(err){
-               next(new Error("Invalid token"));
+               next(new Error("Invalidd token"));
           }
           
      })
