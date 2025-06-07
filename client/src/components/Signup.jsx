@@ -9,9 +9,10 @@ export default function Signup() {
         email: '',
         password: '',
         firstName: '',
-        lastName: '',
+        LastName: '',
         address: '',
-        role: 'patient'
+        role: 'patient',
+        phone: ''
     });
 
     const handleChange = (e) => {
@@ -24,7 +25,11 @@ export default function Signup() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            await signup(formData);
+            const dataToSubmit = { ...formData };
+            if (!dataToSubmit.phone) {
+                delete dataToSubmit.phone;
+            }
+            await signup(dataToSubmit);
             navigate('/login');
         } catch (err) {
             console.error('Signup failed:', err);
@@ -44,7 +49,7 @@ export default function Signup() {
                         <div>
                             <input
                                 name="email"
-                                type="text"
+                                type="email"
                                 required
                                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                                 placeholder="Email address"
@@ -76,12 +81,22 @@ export default function Signup() {
                         </div>
                         <div>
                             <input
-                                name="lastName"
+                                name="LastName"
                                 type="text"
                                 required
                                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                                 placeholder="Last Name"
-                                value={formData.lastName}
+                                value={formData.LastName}
+                                onChange={handleChange}
+                            />
+                        </div>
+                        <div>
+                            <input
+                                name="phone"
+                                type="tel"
+                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                                placeholder="Phone Number (optional)"
+                                value={formData.phone}
                                 onChange={handleChange}
                             />
                         </div>
@@ -90,21 +105,25 @@ export default function Signup() {
                                 name="address"
                                 type="text"
                                 required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                                 placeholder="Address"
                                 value={formData.address}
                                 onChange={handleChange}
                             />
                         </div>
-                        <input
+                        <div>
+                            <select
                                 name="role"
-                                type="text"
                                 required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                                placeholder="role"
+                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                                 value={formData.role}
                                 onChange={handleChange}
-                            />
+                            >
+                                <option value="patient">Patient</option>
+                                <option value="doctor">Doctor</option>
+                                <option value="staff">Staff</option>
+                            </select>
+                        </div>
                     </div>
 
                     {error && (
