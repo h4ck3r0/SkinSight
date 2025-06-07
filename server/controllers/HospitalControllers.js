@@ -1,5 +1,6 @@
 import HospitalModel from "../models/HospitalModel.js"
 import UserModel from "../models/UserModel.js";
+//doctor
 export async function createHospital(req,res){
     try{
         const {name,phone,address,location,email,service}=req.body;
@@ -14,7 +15,7 @@ export async function createHospital(req,res){
 
     }
 }
-
+//patient
 export async function getHospitals(req,res){
     try{
         const hospitals=await HospitalModel.find()
@@ -26,7 +27,7 @@ export async function getHospitals(req,res){
         res.status(500).json({message:err.message})
     }
 }
-
+//patient
 export async function getHospital(req,res){
     try{
         const hospitalId=req.params.id;
@@ -40,7 +41,7 @@ export async function getHospital(req,res){
         res.status(500).json({message:err.message})
     }
 }
-
+//hospital
 export async function updateHospital(req,res){
      try{
        const data=req.body;
@@ -54,7 +55,7 @@ export async function updateHospital(req,res){
         res.status(500).json({message:err.message})
      }
 }
-
+//hospital
 export async function deleteHospital(req,res){
     try{
         const hospitalId=req.params.id;
@@ -68,7 +69,7 @@ export async function deleteHospital(req,res){
 
     }
 }
-
+//patient
 export async function GetnearBy(req, res) {
     try {
         const { lat, long } = req.params;
@@ -85,7 +86,7 @@ export async function GetnearBy(req, res) {
                 $near: {
                     $geometry: {
                         type: "Point",
-                        coordinates: [latitude, longitude]
+                        coordinates: [longitude, latitude]
                     },
                     $maxDistance: 10000
                 }
@@ -111,7 +112,7 @@ export async function GetnearBy(req, res) {
         });
     }
 }
-
+//hospital
 export async function addDoctor(req, res) {
     try {
         const { doctorId } = req.params;
