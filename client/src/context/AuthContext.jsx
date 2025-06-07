@@ -12,8 +12,10 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    // Configure axios defaults
     axios.defaults.baseURL = 'https://mycarebridge.onrender.com/api';
     axios.defaults.withCredentials = true;
+    axios.defaults.headers.common['Content-Type'] = 'application/json';
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -21,6 +23,7 @@ export const AuthProvider = ({ children }) => {
             axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         }
     }, []);
+
     useEffect(() => {
         const checkAuth = async () => {
             try {
@@ -48,13 +51,11 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem('token', token);
             axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
             setUser(user);
-            console.log(user);
             return user;
         } catch (err) {
-            setError(err.response?.data?.message || 'Signup failed');
-            console.log(err)
-            throw err;
-            
+            const errorMessage = err.response?.data?.message || 'Signup failed';
+            setError(errorMessage);
+            throw new Error(errorMessage);
         }
     };
 
@@ -68,8 +69,9 @@ export const AuthProvider = ({ children }) => {
             setUser(user);
             return user;
         } catch (err) {
-            setError(err.response?.data?.message || 'Signin failed');
-            throw err;
+            const errorMessage = err.response?.data?.message || 'Signin failed';
+            setError(errorMessage);
+            throw new Error(errorMessage);
         }
     };
 
@@ -91,8 +93,9 @@ export const AuthProvider = ({ children }) => {
             setUser(response.data);
             return response.data;
         } catch (err) {
-            setError(err.response?.data?.message || 'Profile update failed');
-            throw err;
+            const errorMessage = err.response?.data?.message || 'Profile update failed';
+            setError(errorMessage);
+            throw new Error(errorMessage);
         }
     };
 

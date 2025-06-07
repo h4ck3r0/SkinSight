@@ -24,21 +24,29 @@ const app=express();
 
 const PORT = process.env.PORT || 3000;
 
+// CORS configuration
+const allowedOrigins = ['http://localhost:5173', 'https://mycarebridge.onrender.com'];
 app.use(cors({
-    origin: process.env.CLIENT_URL || '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true
+    origin: function(origin, callback) {
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, 
     max: 100
 });
 app.use(limiter);
 
-
 app.use(express.json());
 app.use(express.urlencoded({extended:true}));
-app.use
 
 app.use('/api/auth',authRoutes);
 app.use('/api/hospital',middleware,hospitalRoutes)
