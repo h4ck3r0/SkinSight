@@ -24,26 +24,21 @@ const app=express();
 
 const PORT = process.env.PORT || 3000;
 
-// Security middleware
-app.use(helmet());
 app.use(cors({
     origin: process.env.CLIENT_URL || '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
 }));
-
-// Rate limiting
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100 // limit each IP to 100 requests per windowMs
+    windowMs: 15 * 60 * 1000, 
+    max: 100
 });
 app.use(limiter);
 
-// Other middleware
-app.use(compression());
-app.use(morgan('dev'));
+
 app.use(express.json());
 app.use(express.urlencoded({extended:true}));
+app.use
 
 app.use('/api/auth',authRoutes);
 app.use('/api/hospital',middleware,hospitalRoutes)
@@ -55,12 +50,9 @@ app.get("/",(req,res)=>{
     res.send("I will show these mfs who i am ");
 })
 
-// Health check endpoint
 app.get("/health", (req, res) => {
     res.status(200).json({ status: 'healthy' });
 });
-
-// Error handling middleware
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({
@@ -83,7 +75,6 @@ server.listen(PORT,async ()=>{
     }
 })
 
-// Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
     console.error('Unhandled Promise Rejection:', err);
     // Don't crash the server in production
