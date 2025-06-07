@@ -6,13 +6,6 @@ const UserSchema = new mongoose.Schema({
         unique: true,
         required: true
      },
-     phone: {
-        type: String,
-        sparse: true,
-        index: {
-            unique: false
-        }
-     },
      password: {
         type: String,
         required: true
@@ -45,7 +38,6 @@ const UserSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
-
 
 const UserModel = mongoose.model("User", UserSchema);
 

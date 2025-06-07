@@ -11,26 +11,21 @@ export default function Signup() {
         firstName: '',
         LastName: '',
         address: '',
-        role: 'patient',
-        phone: ''
+        role: 'patient'
     });
 
     const handleChange = (e) => {
-        const value = e.target.value;
-        setFormData({
-            ...formData,
-            [e.target.name]: value
-        });
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const dataToSubmit = { ...formData };
-            if (!dataToSubmit.phone.trim()) {
-                delete dataToSubmit.phone;
-            }
-            await signup(dataToSubmit);
+            await signup(formData);
             navigate('/login');
         } catch (err) {
             console.error('Signup failed:', err);
@@ -88,16 +83,6 @@ export default function Signup() {
                                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                                 placeholder="Last Name"
                                 value={formData.LastName}
-                                onChange={handleChange}
-                            />
-                        </div>
-                        <div>
-                            <input
-                                name="phone"
-                                type="tel"
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                                placeholder="Phone Number (optional)"
-                                value={formData.phone}
                                 onChange={handleChange}
                             />
                         </div>
