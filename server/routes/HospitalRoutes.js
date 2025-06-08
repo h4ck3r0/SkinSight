@@ -6,7 +6,7 @@ router.post('/addhospital', createHospital);
 router.get('/getall', getHospitals);
 router.get('/getnearBy/:lat/:long', GetnearBy);
 router.post('/update/:id', updateHospital);
-router.post('/adddocter/:id/:doctorId', addDoctor);
+router.post('/adddoctor/:id/:userId', addDoctor);
 router.get('/:id', getHospital);
 router.delete('/:id', deleteHospital);
 

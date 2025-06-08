@@ -1,5 +1,6 @@
 import HospitalModel from "../models/HospitalModel.js"
 import UserModel from "../models/UserModel.js";
+import DocterModel from "../models/DocterModel.js";
 //doctor
 export async function createHospital(req, res) {
     try {
@@ -143,41 +144,44 @@ export async function GetnearBy(req, res) {
 //hospital
 export async function addDoctor(req, res) {
     try {
-        const { doctorId } = req.params;
+        const { userId } = req.params;
         const hospitalId = req.params.id;
-
-        // Check if hospital exists
         const hospital = await HospitalModel.findById(hospitalId);
         if (!hospital) {
             return res.status(404).json({
                 message: "No hospital found"
             });
         }
-        const doctor = await UserModel.findById(doctorId);
-        if (!doctor) {
+        const user = await UserModel.findById(userId);
+        if (!user) {
             return res.status(404).json({
-                message: "Doctor not found"
+                message: "User not found"
             });
         }
-        if (doctor.role !== "doctor") {
+        if (user.role !== "doctor") {
             return res.status(400).json({
                 message: "User is not a doctor"
             });
         }
-        if (hospital.doctors.includes(doctorId)) {
+
+        if (hospital.doctors.includes(userId)) {
             return res.status(400).json({
                 message: "Doctor already exists in this hospital"
             });
         }
-        hospital.doctors.push(doctorId);
+
+        // Add doctor to hospital
+        hospital.doctors.push(userId);
         await hospital.save();
-        doctor.hospitalId = hospitalId;
-        await doctor.save();
+
+        // Update user's hospitalId
+        user.hospitalId = hospitalId;
+        await user.save();
 
         res.status(200).json({
             message: "Doctor added successfully to hospital",
             hospital: hospital,
-            doctor: doctor
+            doctor: user
         });
 
     } catch (err) {

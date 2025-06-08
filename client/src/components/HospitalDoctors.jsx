@@ -48,11 +48,11 @@ export default function HospitalDoctors() {
         }
     };
 
-    const addDoctorToHospital = async (doctorId) => {
+    const addDoctorToHospital = async (userId) => {
         try {
             setLoading(true);
             await axios.post(
-                `https://mycarebridge.onrender.com/api/hospital/adddocter/${hospitalId}/${doctorId}`,
+                `https://mycarebridge.onrender.com/api/hospital/adddoctor/${hospitalId}/${userId}`,
                 {},
                 {
                     headers: {
@@ -60,10 +60,10 @@ export default function HospitalDoctors() {
                     }
                 }
             );
-              await fetchDoctors();
+            await fetchDoctors();
             await fetchHospitalDoctors();
         } catch (err) {
-            setError('Failed to add doctor');
+            setError(err.response?.data?.message || 'Failed to add doctor');
             console.error('Error adding doctor:', err);
         } finally {
             setLoading(false);
@@ -74,38 +74,47 @@ export default function HospitalDoctors() {
     if (error) return <div className="text-red-500">{error}</div>;
 
     return (
-        <div className="p-6">
-            <h2 className="text-2xl font-bold mb-6">Manage Hospital Doctors</h2>
-            <div className="mb-8">
-                <h3 className="text-xl font-semibold mb-4">Current Hospital Doctors</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {hospitalDoctors.map((doctor) => (
-                        <div key={doctor._id} className="bg-white p-4 rounded-lg shadow">
-                            <h4 className="font-bold">{doctor.firstName} {doctor.lastName}</h4>
-                            <p>Specialization: {doctor.specialization}</p>
-                            <p>Experience: {doctor.experience} years</p>
-                        </div>
-                    ))}
-                </div>
-            </div>  
-            <div>
-                <h3 className="text-xl font-semibold mb-4">Available Doctors</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {availableDoctors
-                        .filter(doctor => !hospitalDoctors.some(hd => hd._id === doctor._id))
-                        .map((doctor) => (
-                            <div key={doctor._id} className="bg-white p-4 rounded-lg shadow">
-                                <h4 className="font-bold">{doctor.firstName} {doctor.lastName}</h4>
-                                <p>Specialization: {doctor.specialization}</p>
-                                <p>Experience: {doctor.experience} years</p>
-                                <button
-                                    onClick={() => addDoctorToHospital(doctor._id)}
-                                    className="mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                                >
-                                    Add to Hospital
-                                </button>
+        <div className="space-y-6">
+            <h2 className="text-2xl font-bold mb-4">Hospital Doctors</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <h3 className="text-xl font-semibold mb-2">Available Doctors</h3>
+                    <div className="space-y-2">
+                        {availableDoctors.map((doctor) => (
+                            <div key={doctor._id} className="bg-white p-4 rounded shadow">
+                                <p className="font-semibold">{doctor.firstName} {doctor.lastName}</p>
+                                <p className="text-gray-600">{doctor.email}</p>
+                                {!hospitalDoctors.includes(doctor._id) && (
+                                    <button
+                                        onClick={() => addDoctorToHospital(doctor._id)}
+                                        className="mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                                    >
+                                        Add to Hospital
+                                    </button>
+                                )}
                             </div>
                         ))}
+                    </div>
+                </div>
+
+                <div>
+                    <h3 className="text-xl font-semibold mb-2">Current Hospital Doctors</h3>
+                    <div className="space-y-2">
+                        {hospitalDoctors.length === 0 ? (
+                            <p>No doctors currently in this hospital</p>
+                        ) : (
+                            hospitalDoctors.map((doctorId) => {
+                                const doctor = availableDoctors.find(d => d._id === doctorId);
+                                return doctor ? (
+                                    <div key={doctorId} className="bg-white p-4 rounded shadow">
+                                        <p className="font-semibold">{doctor.firstName} {doctor.lastName}</p>
+                                        <p className="text-gray-600">{doctor.email}</p>
+                                    </div>
+                                ) : null;
+                            })
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

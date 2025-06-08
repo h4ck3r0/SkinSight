@@ -27,7 +27,7 @@ export default function HospitalSelection() {
 
     const joinHospital = async (hospitalId) => {
         try {
-            const updateResponse = await axios.patch(
+            const updateResponse = await axios.put(
                 'https://mycarebridge.onrender.com/api/auth/updateHospital', 
                 { hospitalId },
                 {
@@ -38,16 +38,14 @@ export default function HospitalSelection() {
                 }
             );
             const updatedUser = updateResponse.data.user;
-            
-            // Store the updated user data in localStorage
-            localStorage.setItem('user', JSON.stringify(updatedUser));
+                localStorage.setItem('user', JSON.stringify(updatedUser));
             
             const role = updatedUser.role;
             
             if (role === 'doctor') {
-                navigate('/doctor-dashboard');
+                navigate('/doctor');
             } else if (role === 'staff') {
-                navigate('/staff-dashboard');
+                navigate('/hospital');
             }
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to join hospital');

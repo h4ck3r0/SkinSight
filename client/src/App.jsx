@@ -22,9 +22,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          
-          {/* Protected Routes */}
-          <Route path="/patient" element={
+                    <Route path="/patient" element={
             <ProtectedRoute roles={['patient']}>
               <PatientDashBroad />
             </ProtectedRoute>

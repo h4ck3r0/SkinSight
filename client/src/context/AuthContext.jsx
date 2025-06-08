@@ -67,15 +67,11 @@ export const AuthProvider = ({ children }) => {
             setError(null);
             const response = await axios.post('/auth/signin', credentials);
             const { token: newToken, user: userData } = response.data;
-            
-            // Store token in localStorage
             localStorage.setItem('token', newToken);
             setToken(newToken);
             
-            // Set user data in state
             setUser(userData);
             
-            // Return user data for navigation
             return userData;
         } catch (err) {
             setError(err.response?.data?.message || "Login failed");

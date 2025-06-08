@@ -246,8 +246,6 @@ export default function HospitalDashBoard() {
                         )}
                     </div>
                 )}
-
-                {/* Hospital Doctors Management */}
                 {hospital.length > 0 && (
                     <div className="bg-white p-6 rounded-lg shadow-md">
                         <HospitalDoctors />
