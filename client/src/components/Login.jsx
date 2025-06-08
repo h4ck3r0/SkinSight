@@ -15,6 +15,7 @@ export default function Login() {
             const credentials = { email, password }
             const response = await signin(credentials);
             console.log("Login successful:", response);
+            console.log(response.role);
             if (!response.hospitalId && (response.role === "staff" || response.role === "doctor")) {
                 navigate('/hospital-selection');
                 return;
@@ -28,7 +29,7 @@ export default function Login() {
             }
         } catch (err) {
             Setiserr(true);
-            Seterr(err);
+            Seterr(err.message || "Login failed");
         }
     }
 

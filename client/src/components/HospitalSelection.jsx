@@ -14,7 +14,7 @@ export default function HospitalSelection() {
 
     const fetchHospitals = async () => {
         try {
-            const response = await axios.get('/api/hospital/all');
+            const response = await axios.get('/hospital/all');
             setHospitals(response.data.hospitals);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to fetch hospitals');
@@ -26,7 +26,6 @@ export default function HospitalSelection() {
     const joinHospital = async (hospitalId) => {
         try {
             await axios.patch('/auth/updateMe', { hospitalId });
-            // Redirect to appropriate dashboard based on role
             const userResponse = await axios.get('/auth/me');
             const role = userResponse.data.user.role;
             

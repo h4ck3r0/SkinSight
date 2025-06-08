@@ -36,6 +36,7 @@ export const AuthProvider = ({ children }) => {
                 console.error('Auth check failed:', err);
                 localStorage.removeItem('token');
                 setToken(null);
+                setUser(null);
                 delete axios.defaults.headers.common['Authorization'];
             } finally {
                 setLoading(false);
@@ -62,17 +63,25 @@ export const AuthProvider = ({ children }) => {
 
     const signin = async (credentials) => {
         try {
+            setLoading(true);
             setError(null);
             const response = await axios.post('/auth/signin', credentials);
-            const { token: newToken, user } = response.data;
+            const { token: newToken, user: userData } = response.data;
+            
+            // Store token in localStorage
             localStorage.setItem('token', newToken);
             setToken(newToken);
-            setUser(user);
-            return user;
+            
+            // Set user data in state
+            setUser(userData);
+            
+            // Return user data for navigation
+            return userData;
         } catch (err) {
-            const errorMessage = err.response?.data?.message || 'Signin failed';
-            setError(errorMessage);
-            throw new Error(errorMessage);
+            setError(err.response?.data?.message || "Login failed");
+            throw err;
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -81,8 +90,8 @@ export const AuthProvider = ({ children }) => {
             await axios.get('/auth/signout');
             localStorage.removeItem('token');
             setToken(null);
-            delete axios.defaults.headers.common['Authorization'];
             setUser(null);
+            delete axios.defaults.headers.common['Authorization'];
         } catch (err) {
             console.error('Signout error:', err);
         }

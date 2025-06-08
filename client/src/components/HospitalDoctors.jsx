@@ -60,8 +60,7 @@ export default function HospitalDoctors() {
                     }
                 }
             );
-            // Refresh both lists
-            await fetchDoctors();
+              await fetchDoctors();
             await fetchHospitalDoctors();
         } catch (err) {
             setError('Failed to add doctor');
@@ -88,9 +87,7 @@ export default function HospitalDoctors() {
                         </div>
                     ))}
                 </div>
-            </div>
-
-            {/* Available Doctors to Add */}
+            </div>  
             <div>
                 <h3 className="text-xl font-semibold mb-4">Available Doctors</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
