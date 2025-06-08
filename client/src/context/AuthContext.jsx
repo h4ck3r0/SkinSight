@@ -11,22 +11,23 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [token, setToken] = useState(localStorage.getItem('token'));
 
     axios.defaults.baseURL = 'https://mycarebridge.onrender.com/api';
     axios.defaults.withCredentials = true;
     axios.defaults.headers.common['Content-Type'] = 'application/json';
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
         if (token) {
             axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        } else {
+            delete axios.defaults.headers.common['Authorization'];
         }
-    }, []);
+    }, [token]);
 
     useEffect(() => {
         const checkAuth = async () => {
             try {
-                const token = localStorage.getItem('token');
                 if (token) {
                     const response = await axios.get('/auth/me');
                     setUser(response.data.user);
@@ -34,21 +35,22 @@ export const AuthProvider = ({ children }) => {
             } catch (err) {
                 console.error('Auth check failed:', err);
                 localStorage.removeItem('token');
+                setToken(null);
                 delete axios.defaults.headers.common['Authorization'];
             } finally {
                 setLoading(false);
             }
         };
         checkAuth();
-    }, []);
+    }, [token]);
 
     const signup = async (userData) => {
         try {
             setError(null);
             const response = await axios.post('/auth/signup', userData);
-            const { token, user } = response.data;
-            localStorage.setItem('token', token);
-            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            const { token: newToken, user } = response.data;
+            localStorage.setItem('token', newToken);
+            setToken(newToken);
             setUser(user);
             return user;
         } catch (err) {
@@ -62,9 +64,9 @@ export const AuthProvider = ({ children }) => {
         try {
             setError(null);
             const response = await axios.post('/auth/signin', credentials);
-            const { token, user } = response.data;
-            localStorage.setItem('token', token);
-            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            const { token: newToken, user } = response.data;
+            localStorage.setItem('token', newToken);
+            setToken(newToken);
             setUser(user);
             return user;
         } catch (err) {
@@ -78,6 +80,7 @@ export const AuthProvider = ({ children }) => {
         try {
             await axios.get('/auth/signout');
             localStorage.removeItem('token');
+            setToken(null);
             delete axios.defaults.headers.common['Authorization'];
             setUser(null);
         } catch (err) {
@@ -100,6 +103,7 @@ export const AuthProvider = ({ children }) => {
 
     const value = {
         user,
+        token,
         loading,
         error,
         signup,

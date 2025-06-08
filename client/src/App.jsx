@@ -9,6 +9,8 @@ import DoctorDashBoard from './components/DoctorDashBroard.jsx'
 import PatientDashBroad from './components/PatientDashBroad.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import HospitalDashBoard from './components/HospitalDashborad.jsx'
+import HospitalSelection from './components/HospitalSelection.jsx'
+import ProtectedRoute from './ProtectedRoute.jsx'
 
 function App() {
   const [count, setCount] = useState(0)
@@ -18,11 +20,33 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/patient" element={<PatientDashBroad />} />
-          <Route path="/doctor" element={<DoctorDashBoard />} />
-          <Route path='/hospital' element={<HospitalDashBoard/>}/>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          
+          {/* Protected Routes */}
+          <Route path="/patient" element={
+            <ProtectedRoute roles={['patient']}>
+              <PatientDashBroad />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/doctor" element={
+            <ProtectedRoute roles={['doctor']}>
+              <DoctorDashBoard />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/hospital" element={
+            <ProtectedRoute roles={['staff']}>
+              <HospitalDashBoard />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/hospital-selection" element={
+            <ProtectedRoute roles={['staff', 'doctor']}>
+              <HospitalSelection />
+            </ProtectedRoute>
+          } />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

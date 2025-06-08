@@ -1,18 +1,46 @@
 import HospitalModel from "../models/HospitalModel.js"
 import UserModel from "../models/UserModel.js";
 //doctor
-export async function createHospital(req,res){
-    try{
-        const {name,phone,address,location,email,service}=req.body;
-        const Check=await HospitalModel.findOne({email:email})
-        if(Check){
-            res.status(400).json({message:"Hospital already exists"})
+export async function createHospital(req, res) {
+    try {
+        const { name, phone, address, location, email, service } = req.body;
+        
+        // Validate required fields
+        if (!name || !phone || !address || !email || !location) {
+            return res.status(400).json({ message: "All required fields must be provided" });
         }
-       const hospital= await HospitalModel.create({name,phone,address,location,email,service})
-        res.status(200).json({message:"Hospital created successfully",hospital})
-    }catch(err){
-        res.status(500).json({message:err.message})
 
+        // Check if hospital with same email exists
+        const existingHospital = await HospitalModel.findOne({ email });
+        if (existingHospital) {
+            return res.status(400).json({ message: "Hospital with this email already exists" });
+        }
+
+        // Create hospital
+        const hospital = await HospitalModel.create({
+            name,
+            phone,
+            address,
+            location,
+            email,
+            service: service || []
+        });
+
+        // Update user's hospitalId if user is provided
+        if (req.user) {
+            await UserModel.findByIdAndUpdate(req.user._id, { hospitalId: hospital._id });
+        }
+
+        res.status(201).json({
+            message: "Hospital created successfully",
+            hospital
+        });
+    } catch (err) {
+        console.error("CreateHospital error:", err);
+        res.status(500).json({
+            message: "Error creating hospital",
+            error: err.message
+        });
     }
 }
 //patient

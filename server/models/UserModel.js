@@ -33,10 +33,13 @@ const UserSchema = new mongoose.Schema({
      },
      hospitalId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Hospital'
+        ref: 'Hospital',
+        select: true
      }
 }, {
-    timestamps: true
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
 });
 
 const UserModel = mongoose.model("User", UserSchema);

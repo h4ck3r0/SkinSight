@@ -1,22 +1,30 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from "../context/AuthContext";
 
 export default function HospitalDoctors() {
     const [availableDoctors, setAvailableDoctors] = useState([]);
     const [hospitalDoctors, setHospitalDoctors] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const hospitalId = localStorage.getItem('hospitalId'); // Assuming you store hospitalId after login
+    const [error, setError] = useState(null);   
+    const hospitalId = localStorage.getItem('hospitalId');
+    const { token } = useAuth();
 
     useEffect(() => {
-        fetchDoctors();
-        fetchHospitalDoctors();
-    }, []);
+        if (hospitalId) {
+            fetchDoctors();
+            fetchHospitalDoctors();
+        }
+    }, [hospitalId]);
 
     const fetchDoctors = async () => {
         try {
             setLoading(true);
-            const response = await axios.get('https://mycarebridge.onrender.com/api/doctor/getall');
+            const response = await axios.get('https://mycarebridge.onrender.com/api/doctors/getall', {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
             setAvailableDoctors(response.data.doctors);
         } catch (err) {
             setError('Failed to fetch doctors');
@@ -28,7 +36,11 @@ export default function HospitalDoctors() {
 
     const fetchHospitalDoctors = async () => {
         try {
-            const response = await axios.get(`https://mycarebridge.onrender.com/api/hospital/${hospitalId}`);
+            const response = await axios.get(`https://mycarebridge.onrender.com/api/hospital/${hospitalId}`, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
             setHospitalDoctors(response.data.hospital.doctors || []);
         } catch (err) {
             setError('Failed to fetch hospital doctors');
@@ -39,7 +51,15 @@ export default function HospitalDoctors() {
     const addDoctorToHospital = async (doctorId) => {
         try {
             setLoading(true);
-            await axios.post(`https://mycarebridge.onrender.com/api/hospital/adddocter/${hospitalId}/${doctorId}`);
+            await axios.post(
+                `https://mycarebridge.onrender.com/api/hospital/adddocter/${hospitalId}/${doctorId}`,
+                {},
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }
+            );
             // Refresh both lists
             await fetchDoctors();
             await fetchHospitalDoctors();
@@ -57,8 +77,6 @@ export default function HospitalDoctors() {
     return (
         <div className="p-6">
             <h2 className="text-2xl font-bold mb-6">Manage Hospital Doctors</h2>
-            
-            {/* Current Hospital Doctors */}
             <div className="mb-8">
                 <h3 className="text-xl font-semibold mb-4">Current Hospital Doctors</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

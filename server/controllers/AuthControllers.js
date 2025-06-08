@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken"
 import UserModel from "../models/UserModel.js";
+
 export async function SignUp(req,res){
     try{
       const {email,password,role,firstName,lastName,address,dob}=req.body;
@@ -32,7 +33,24 @@ export async function SignIn(req,res){
          }
 
          const token=jwt.sign({email},process.env.JWT_SECRET,{expiresIn:"1h"});
-         res.status(200).json({message:"User logged in successfully",token,user});
+         
+         // Create a user object with only the necessary fields
+         const userResponse = {
+             _id: user._id,
+             email: user.email,
+             firstName: user.firstName,
+             LastName: user.LastName,
+             role: user.role,
+             address: user.address,
+             dob: user.dob,
+             hospitalId: user.hospitalId
+         };
+
+         res.status(200).json({
+             message:"User logged in successfully",
+             token,
+             user: userResponse
+         });
     }catch(err){
         res.status(500).json(err);
         console.log(err);
@@ -47,7 +65,6 @@ export async function SignOut(req,res){
         res.status(500).json(err);
         console.log(err);
     }
-    
 }
 
 export async function GetMe(req, res) {
@@ -67,7 +84,8 @@ export async function GetMe(req, res) {
             lastName: user.lastName,
             role: user.role,
             address: user.address,
-            dob: user.dob
+            dob: user.dob,
+            hospitalId: user.hospitalId
         };
 
         res.status(200).json({
