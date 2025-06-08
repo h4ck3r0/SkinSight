@@ -17,6 +17,8 @@ export default function Login() {
            console.log(response);
            if(response.role==="patient"){
               navigate('/patient')
+           }else if(response.role==="staff"){
+             navigate('/hospital')
            }else{
               navigate('/doctor')
            }
@@ -34,7 +36,6 @@ export default function Login() {
           <div>
              <input placeholder="email" onChange={(e)=>Setemail(e.target.value)}/>
              <input placeholder="password" onChange={(e)=>Setpassword(e.target.value)}/>
-
              <button onClick={singin}>
                 Click Me
              </button>

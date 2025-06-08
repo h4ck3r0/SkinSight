@@ -117,31 +117,39 @@ export async function addDoctor(req, res) {
     try {
         const { doctorId } = req.params;
         const hospitalId = req.params.id;
+
+        // Check if hospital exists
         const hospital = await HospitalModel.findById(hospitalId);
         if (!hospital) {
             return res.status(404).json({
                 message: "No hospital found"
             });
         }
-
+        const doctor = await UserModel.findById(doctorId);
+        if (!doctor) {
+            return res.status(404).json({
+                message: "Doctor not found"
+            });
+        }
+        if (doctor.role !== "doctor") {
+            return res.status(400).json({
+                message: "User is not a doctor"
+            });
+        }
         if (hospital.doctors.includes(doctorId)) {
             return res.status(400).json({
                 message: "Doctor already exists in this hospital"
             });
         }
-        const isdoctor = await UserModel.findById(doctorId);
-        if (isdoctor.role !== "doctor") {
-            return res.status(404).json({
-                message: "No doctor found"
-            });
-        }
-
         hospital.doctors.push(doctorId);
         await hospital.save();
+        doctor.hospitalId = hospitalId;
+        await doctor.save();
 
         res.status(200).json({
-            message: "Doctor added successfully",
-            hospital: hospital
+            message: "Doctor added successfully to hospital",
+            hospital: hospital,
+            doctor: doctor
         });
 
     } catch (err) {
