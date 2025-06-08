@@ -33,9 +33,7 @@ export async function SignIn(req,res){
          }
 
          const token=jwt.sign({email},process.env.JWT_SECRET,{expiresIn:"1h"});
-         
-         // Create a user object with only the necessary fields
-         const userResponse = {
+              const userResponse = {
              _id: user._id,
              email: user.email,
              firstName: user.firstName,
@@ -134,6 +132,68 @@ export async function UpdateMe(req, res) {
         res.status(500).json({ 
             message: "Failed to update user",
             error: err.message 
+        });
+    }
+}
+
+export async function UpdateHospital(req,res){
+    try{
+
+        const hospitalId = req.params.id;
+
+        const response=await UserModel.findOneAndUpdate({_id:user._id},req.body,{new:true});
+    }catch(err){
+        console.error("UpdateMe error:", err);
+        res.status(500).json({ 
+            message: "Failed to update user",
+            error: err.message 
+        });
+    }
+}
+
+export async function UpdateUserHospital(req, res) {
+    try {
+        const { hospitalId } = req.body;
+        const userId = req.user._id;
+
+        if (!hospitalId) {
+            return res.status(400).json({
+                message: "Hospital ID is required"
+            });
+        }
+
+        const updatedUser = await UserModel.findByIdAndUpdate(
+            userId,
+            { $set: { hospitalId } },
+            { new: true }
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        const userData = {
+            _id: updatedUser._id,
+            email: updatedUser.email,
+            firstName: updatedUser.firstName,
+            lastName: updatedUser.lastName,
+            role: updatedUser.role,
+            address: updatedUser.address,
+            dob: updatedUser.dob,
+            hospitalId: updatedUser.hospitalId
+        };
+
+        res.status(200).json({
+            message: "User's hospital updated successfully",
+            user: userData
+        });
+    } catch (err) {
+        console.error("UpdateUserHospital error:", err);
+        res.status(500).json({
+            message: "Failed to update user's hospital",
+            error: err.message
         });
     }
 }

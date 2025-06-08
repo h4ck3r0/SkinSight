@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function HospitalSelection() {
     const [hospitals, setHospitals] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
+    const { token } = useAuth();
 
     useEffect(() => {
         fetchHospitals();
@@ -25,10 +27,16 @@ export default function HospitalSelection() {
 
     const joinHospital = async (hospitalId) => {
         try {
-            // First update the user's hospitalId
-            const updateResponse = await axios.patch('https://mycarebridge.onrender.com/api/auth/updateMe', { hospitalId });
-            
-            // Get the updated user data from the response
+            const updateResponse = await axios.patch(
+                'https://mycarebridge.onrender.com/api/auth/updateHospital', 
+                { hospitalId },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
             const updatedUser = updateResponse.data.user;
             
             // Store the updated user data in localStorage
