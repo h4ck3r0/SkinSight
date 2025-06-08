@@ -24,7 +24,7 @@ export default function HospitalDashBoard(){
                     Authorization:`Bearer ${token}`
                 }
             });
-            Sethospital(response.data)
+            Sethospital(prevarr=>[...prevarr,response.data]);
             console.log(response.data);
         }catch(err){
           err && Seterr(err.response.data);
@@ -40,10 +40,12 @@ export default function HospitalDashBoard(){
                 Authorization:`Bearer ${token}`
             }
         });
+        Sethospital(prevarr=>[...prevarr,response.data]);
        }catch(err){
         err && Seterr(err.response.data);
        }
     }
+    
     return(
         <div>
             <div>

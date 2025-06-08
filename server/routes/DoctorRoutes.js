@@ -7,7 +7,8 @@ import {
     getDoctorAppointments,
     getNextAvailableSlot,
     deleteDoctorProfile,
-    approveAppointment
+    approveAppointment,
+    getAllDoctors
 } from "../controllers/DoctorControllers.js"
 
 const router = express.Router();
@@ -20,5 +21,6 @@ router.put("/availability", updateAvailability);
 router.get("/availability/next", getNextAvailableSlot);
 router.get("/appointments", getDoctorAppointments);
 router.put("/appointments/:appointmentId/approve", approveAppointment);
+router.get("/getall", getAllDoctors);
 
 export default router;

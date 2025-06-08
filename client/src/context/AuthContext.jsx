@@ -12,7 +12,6 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Configure axios defaults
     axios.defaults.baseURL = 'https://mycarebridge.onrender.com/api';
     axios.defaults.withCredentials = true;
     axios.defaults.headers.common['Content-Type'] = 'application/json';

@@ -257,3 +257,22 @@ export async function approveAppointment(req, res) {
         });
     }
 }
+
+export async function getAllDoctors(req, res) {
+    try {
+        const doctors = await DocterModel.find()
+            .populate('user', 'firstName lastName email')
+            .select('-__v');
+
+        res.status(200).json({
+            message: "Doctors retrieved successfully",
+            doctors: doctors
+        });
+    } catch (err) {
+        console.error("GetAllDoctors error:", err);
+        res.status(500).json({
+            message: "Error retrieving doctors",
+            error: err.message
+        });
+    }
+}
