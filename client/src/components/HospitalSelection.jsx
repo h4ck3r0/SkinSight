@@ -14,7 +14,7 @@ export default function HospitalSelection() {
 
     const fetchHospitals = async () => {
         try {
-            const response = await axios.get('/hospital/all');
+            const response = await axios.get('https://mycarebridge.onrender.com/api/hospital/getall');
             setHospitals(response.data.hospitals);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to fetch hospitals');
@@ -25,9 +25,16 @@ export default function HospitalSelection() {
 
     const joinHospital = async (hospitalId) => {
         try {
-            await axios.patch('/auth/updateMe', { hospitalId });
-            const userResponse = await axios.get('/auth/me');
-            const role = userResponse.data.user.role;
+            // First update the user's hospitalId
+            const updateResponse = await axios.patch('https://mycarebridge.onrender.com/api/auth/updateMe', { hospitalId });
+            
+            // Get the updated user data from the response
+            const updatedUser = updateResponse.data.user;
+            
+            // Store the updated user data in localStorage
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            
+            const role = updatedUser.role;
             
             if (role === 'doctor') {
                 navigate('/doctor-dashboard');

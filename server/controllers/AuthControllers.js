@@ -110,9 +110,30 @@ export async function UpdateMe(req, res) {
             { new: true } 
         );
 
-        res.status(200).json(updatedUser); 
+        if (!updatedUser) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        const userData = {
+            _id: updatedUser._id,
+            email: updatedUser.email,
+            firstName: updatedUser.firstName,
+            lastName: updatedUser.lastName,
+            role: updatedUser.role,
+            address: updatedUser.address,
+            dob: updatedUser.dob,
+            hospitalId: updatedUser.hospitalId
+        };
+
+        res.status(200).json({
+            message: "User updated successfully",
+            user: userData
+        });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Failed to update user' });
+        console.error("UpdateMe error:", err);
+        res.status(500).json({ 
+            message: "Failed to update user",
+            error: err.message 
+        });
     }
 }
