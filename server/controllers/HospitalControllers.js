@@ -137,6 +137,7 @@ export async function GetnearBy(req, res) {
             }
         }).populate({
             path: 'doctors',
+            model: 'DoctorProfile',
             populate: {
                 path: 'user',
                 select: 'firstName lastName email'
@@ -144,8 +145,6 @@ export async function GetnearBy(req, res) {
         });
 
         console.log("Found hospitals:", hospitals.length);
-
-        // Transform the data to include complete doctor information
         const transformedHospitals = hospitals.map(hospital => {
             const transformedDoctors = hospital.doctors.map(doctor => ({
                 _id: doctor._id,

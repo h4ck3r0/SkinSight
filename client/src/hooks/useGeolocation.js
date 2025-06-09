@@ -11,14 +11,16 @@ export const useGeolocation = () => {
         }  
 
         const successHandler = (position) => {
+            console.log("Geolocation success:", position.coords);
             setLocation({
                 lat: position.coords.latitude,
                 lng: position.coords.longitude
             });
-            setError('');
+            setError(null);
         };
 
         const errorHandler = (error) => {
+            console.error("Geolocation error:", error);
             switch (error.code) {
                 case error.PERMISSION_DENIED:
                     setError('Please allow location access to find doctors near you');
@@ -34,11 +36,13 @@ export const useGeolocation = () => {
             }
         };
 
-        navigator.geolocation.getCurrentPosition(successHandler, errorHandler, {
+        const options = {
             enableHighAccuracy: true,
-            timeout: 5000,
+            timeout: 10000,
             maximumAge: 0
-        });
+        };
+
+        navigator.geolocation.getCurrentPosition(successHandler, errorHandler, options);
 
     }, []);
 

@@ -100,7 +100,8 @@ export default function PatientDashBroad() {
 
     async function GetnearByHospital() {
         if (!location?.lat || !location?.lng) {
-            setError("Location not available");
+            console.log("Location not available:", location);
+            setError("Location not available. Please ensure location access is enabled.");
             return;
         }
 
@@ -119,7 +120,7 @@ export default function PatientDashBroad() {
 
             if (isNaN(lat) || isNaN(lng)) {
                 console.log("Invalid coordinates detected");
-                setError("Invalid location coordinates");
+                setError("Invalid location coordinates. Please try refreshing the page.");
                 return;
             }
 
