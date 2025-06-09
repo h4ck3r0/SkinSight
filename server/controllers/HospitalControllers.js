@@ -192,12 +192,21 @@ export async function addDoctor(req, res) {
             });
         }
 
-        if (hospital.doctors.includes(userId)) {
+        // Find the doctor's profile
+        const doctorProfile = await DocterModel.findOne({ user: userId });
+        if (!doctorProfile) {
+            return res.status(404).json({
+                message: "Doctor profile not found"
+            });
+        }
+
+        if (hospital.doctors.includes(doctorProfile._id)) {
             return res.status(400).json({
                 message: "Doctor already exists in this hospital"
             });
         }
-        hospital.doctors.push(userId);
+
+        hospital.doctors.push(doctorProfile._id);
         await hospital.save();
         user.hospitalId = hospitalId;
         await user.save();
@@ -205,7 +214,7 @@ export async function addDoctor(req, res) {
         res.status(200).json({
             message: "Doctor added successfully to hospital",
             hospital: hospital,
-            doctor: user
+            doctor: doctorProfile
         });
 
     } catch (err) {
