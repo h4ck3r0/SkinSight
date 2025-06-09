@@ -1,5 +1,5 @@
 import express from "express"
-import { createHospital, getHospitals, getHospital, updateHospital, deleteHospital, GetnearBy, addDoctor, cleanupInvalidDoctors } from "../controllers/HospitalControllers.js";
+import { createHospital, getHospitals, getHospital, updateHospital, deleteHospital, GetnearBy, addDoctor, cleanupInvalidDoctors, createTestDoctor } from "../controllers/HospitalControllers.js";
 const router = express.Router();
 
 router.post('/addhospital', createHospital);
@@ -11,5 +11,6 @@ router.delete('/:id', deleteHospital);
 router.post('/:id/doctors', addDoctor);
 router.post("/:id/addDoctor/:userId", addDoctor);
 router.get("/cleanup-doctors", cleanupInvalidDoctors);
+router.post("/:id/create-test-doctor", createTestDoctor);
 
 export default router;
