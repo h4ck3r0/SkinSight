@@ -1,6 +1,6 @@
 import Appointment from "../models/AppointmentModel.js";
 import DocterModel from "../models/DocterModel.js";
-
+//patient
 export async function createAppointment(req, res) {
     try {
         const { doctor, patient, hospital, appointmentTime, reason, appointmentDate } = req.body;
@@ -29,8 +29,6 @@ export async function createAppointment(req, res) {
                 nextAvailableSlot: doctorProfile.getNextAvailableSlot(appointmentDateTime)
             });
         }
-
-        // Create the appointment
         const appointment = new Appointment({
             doctor,
             patient,
@@ -64,7 +62,7 @@ export async function createAppointment(req, res) {
         });
     }
 }
-
+//doctor and patient
 export async function getAppointment(req, res) {
     try{
          const AppointmentId=req.params.id;
@@ -91,7 +89,7 @@ export async function updateAppointment(req, res) {
         res.status(500).json(err);
     }
 }
-
+//doctor or patient
 export async function deleteAppointment(req, res) {
     try{
         const AppointmentId=req.params.id;
@@ -114,7 +112,7 @@ export async function getAllAppointment(req, res) {
         res.status(500).json(err);
     }
 }
-
+//doctor or satff
 export async function approveAppointment(req, res) {
     try {
         const appointmentId = req.params.appointmentId;

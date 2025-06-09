@@ -261,12 +261,44 @@ export async function approveAppointment(req, res) {
 export async function getAllDoctors(req, res) {
     try {
         const doctors = await DocterModel.find()
-            .populate('user', 'firstName lastName email')
+            .populate('user', 'firstName lastName email hospitalId')
+            .populate({
+                path: 'user',
+                populate: {
+                    path: 'hospitalId',
+                    model: 'Hospital',
+                    select: 'name address phone email service'
+                }
+            })
             .select('-__v');
+
+        // Transform the data to include hospital information
+        const transformedDoctors = doctors.map(doctor => ({
+            _id: doctor._id,
+            user: {
+                _id: doctor.user._id,
+                firstName: doctor.user.firstName,
+                lastName: doctor.user.lastName,
+                email: doctor.user.email,
+                hospitalId: doctor.user.hospitalId
+            },
+            specialization: doctor.specialization,
+            qualifications: doctor.qualifications,
+            experience: doctor.experience,
+            consultationFee: doctor.consultationFee,
+            availability: doctor.availability,
+            languages: doctor.languages,
+            bio: doctor.bio,
+            address: doctor.address,
+            location: doctor.location,
+            rating: doctor.rating,
+            totalRatings: doctor.totalRatings,
+            hospital: doctor.user.hospitalId // Include hospital details
+        }));
 
         res.status(200).json({
             message: "Doctors retrieved successfully",
-            doctors: doctors
+            doctors: transformedDoctors
         });
     } catch (err) {
         console.error("GetAllDoctors error:", err);

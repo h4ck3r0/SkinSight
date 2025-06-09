@@ -1,7 +1,7 @@
 import HospitalModel from "../models/HospitalModel.js"
 import UserModel from "../models/UserModel.js";
 import DocterModel from "../models/DocterModel.js";
-//doctor
+//doctor-C
 export async function createHospital(req, res) {
     try {
         const { name, phone, address, location, email, service } = req.body;
@@ -44,7 +44,7 @@ export async function createHospital(req, res) {
         });
     }
 }
-//patient
+//patient-NP
 export async function getHospitals(req,res){
     try{
         const hospitals=await HospitalModel.find()
@@ -56,7 +56,7 @@ export async function getHospitals(req,res){
         res.status(500).json({message:err.message})
     }
 }
-//patient
+//patient-Np
 export async function getHospital(req,res){
     try{
         const hospitalId=req.params.id;
@@ -70,7 +70,7 @@ export async function getHospital(req,res){
         res.status(500).json({message:err.message})
     }
 }
-//hospital
+//hospital-C
 export async function updateHospital(req,res){
      try{
        const data=req.body;
@@ -84,7 +84,7 @@ export async function updateHospital(req,res){
         res.status(500).json({message:err.message})
      }
 }
-//hospital
+//hospital-NN
 export async function deleteHospital(req,res){
     try{
         const hospitalId=req.params.id;
@@ -98,50 +98,61 @@ export async function deleteHospital(req,res){
 
     }
 }
-//patient
+//patient-C
 export async function GetnearBy(req, res) {
     try {
-        const { lat, long } = req.params;
-        const latitude = parseFloat(lat);
-        const longitude = parseFloat(long);
+        const { lat, lng } = req.params;
+        const maxDistance = 10000; // 10km radius
 
-        if (isNaN(latitude) || isNaN(longitude)) {
-            return res.status(400).json({
-                message: "Invalid coordinates provided"
-            });
-        }
         const hospitals = await HospitalModel.find({
             location: {
                 $near: {
                     $geometry: {
                         type: "Point",
-                        coordinates: [longitude, latitude]
+                        coordinates: [parseFloat(lng), parseFloat(lat)]
                     },
-                    $maxDistance: 10000
+                    $maxDistance: maxDistance
                 }
             }
-        });
+        })
+        .populate({
+            path: 'doctors',
+            populate: {
+                path: 'user',
+                model: 'User',
+                select: 'firstName lastName email'
+            }
+        })
+        .select('-__v');
 
-        if (!hospitals || hospitals.length === 0) {
-            return res.status(404).json({
-                message: "No hospitals found within the specified radius"
-            });
-        }
+        // Transform the data to include complete doctor information
+        const transformedHospitals = hospitals.map(hospital => ({
+            ...hospital.toObject(),
+            doctors: hospital.doctors.map(doctor => ({
+                _id: doctor._id,
+                name: `${doctor.user.firstName} ${doctor.user.lastName}`,
+                specialization: doctor.specialization,
+                experience: doctor.experience,
+                consultationFee: doctor.consultationFee,
+                languages: doctor.languages,
+                bio: doctor.bio,
+                availability: doctor.availability
+            }))
+        }));
 
         res.status(200).json({
             message: "Hospitals found",
-            hospitals: hospitals
+            hospitals: transformedHospitals
         });
-
     } catch (err) {
-        console.error("GetnearBy error:", err);
+        console.error("GetNearBy error:", err);
         res.status(500).json({
             message: "Error finding nearby hospitals",
             error: err.message
         });
     }
 }
-//hospital
+//hospital-C
 export async function addDoctor(req, res) {
     try {
         const { userId } = req.params;
@@ -169,12 +180,8 @@ export async function addDoctor(req, res) {
                 message: "Doctor already exists in this hospital"
             });
         }
-
-        // Add doctor to hospital
         hospital.doctors.push(userId);
         await hospital.save();
-
-        // Update user's hospitalId
         user.hospitalId = hospitalId;
         await user.save();
 

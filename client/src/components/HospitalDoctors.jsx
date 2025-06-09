@@ -83,11 +83,13 @@ export default function HospitalDoctors() {
                     <div className="space-y-2">
                         {availableDoctors.map((doctor) => (
                             <div key={doctor._id} className="bg-white p-4 rounded shadow">
-                                <p className="font-semibold">{doctor.firstName} {doctor.lastName}</p>
-                                <p className="text-gray-600">{doctor.email}</p>
-                                {!hospitalDoctors.includes(doctor._id) && (
+                                <p className="font-semibold">{doctor.user.firstName} {doctor.user.lastName}</p>
+                                <p className="text-gray-600">{doctor.user.email}</p>
+                                <p className="text-sm text-gray-500">Specialization: {doctor.specialization}</p>
+                                <p className="text-sm text-gray-500">Experience: {doctor.experience} years</p>
+                                {!hospitalDoctors.includes(doctor.user._id) && (
                                     <button
-                                        onClick={() => addDoctorToHospital(doctor._id)}
+                                        onClick={() => addDoctorToHospital(doctor.user._id)}
                                         className="mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                                     >
                                         Add to Hospital
@@ -105,11 +107,13 @@ export default function HospitalDoctors() {
                             <p>No doctors currently in this hospital</p>
                         ) : (
                             hospitalDoctors.map((doctorId) => {
-                                const doctor = availableDoctors.find(d => d._id === doctorId);
+                                const doctor = availableDoctors.find(d => d.user._id === doctorId);
                                 return doctor ? (
                                     <div key={doctorId} className="bg-white p-4 rounded shadow">
-                                        <p className="font-semibold">{doctor.firstName} {doctor.lastName}</p>
-                                        <p className="text-gray-600">{doctor.email}</p>
+                                        <p className="font-semibold">{doctor.user.firstName} {doctor.user.lastName}</p>
+                                        <p className="text-gray-600">{doctor.user.email}</p>
+                                        <p className="text-sm text-gray-500">Specialization: {doctor.specialization}</p>
+                                        <p className="text-sm text-gray-500">Experience: {doctor.experience} years</p>
                                     </div>
                                 ) : null;
                             })
