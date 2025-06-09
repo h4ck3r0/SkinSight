@@ -47,13 +47,45 @@ export async function createHospital(req, res) {
 //patient-NP
 export async function getHospitals(req,res){
     try{
-        const hospitals=await HospitalModel.find()
+        const hospitals = await HospitalModel.find()
+            .populate({
+                path: 'doctors',
+                model: 'DoctorProfile',
+                populate: {
+                    path: 'user',
+                    select: 'firstName lastName email'
+                }
+            });
+
         if(!hospitals){
-            res.status(404).json({message:"No hospitals found"})
+            return res.status(404).json({message:"No hospitals found"});
         }
-        res.status(200).json({message:"Hospitals found",hospitals})
+
+        // Transform the hospitals data
+        const transformedHospitals = hospitals.map(hospital => {
+            const transformedDoctors = hospital.doctors.map(doctor => ({
+                _id: doctor._id,
+                name: `${doctor.user.firstName} ${doctor.user.lastName}`,
+                specialization: doctor.specialization,
+                experience: doctor.experience,
+                consultationFee: doctor.consultationFee,
+                languages: doctor.languages,
+                bio: doctor.bio,
+                availability: doctor.availability
+            }));
+
+            return {
+                ...hospital.toObject(),
+                doctors: transformedDoctors
+            };
+        });
+
+        res.status(200).json({
+            message: "Hospitals found",
+            hospitals: transformedHospitals
+        });
     }catch(err){
-        res.status(500).json({message:err.message})
+        res.status(500).json({message:err.message});
     }
 }
 //patient-Np
@@ -167,10 +199,12 @@ export async function GetnearBy(req, res) {
         });
 
         console.log("Found hospitals:", hospitals.length);
+        console.log("Raw hospitals data:", JSON.stringify(hospitals, null, 2));
 
         // Then populate doctors for each hospital
         const populatedHospitals = await Promise.all(
             hospitals.map(async (hospital) => {
+                console.log(`Populating doctors for hospital ${hospital._id}`);
                 const populatedHospital = await HospitalModel.findById(hospital._id)
                     .populate({
                         path: 'doctors',
@@ -180,6 +214,8 @@ export async function GetnearBy(req, res) {
                             select: 'firstName lastName email'
                         }
                     });
+
+                console.log(`Hospital ${hospital._id} doctors:`, populatedHospital.doctors);
 
                 const transformedDoctors = populatedHospital.doctors.map(doctor => ({
                     _id: doctor._id,
@@ -198,6 +234,8 @@ export async function GetnearBy(req, res) {
                 };
             })
         );
+
+        console.log("Final transformed hospitals:", JSON.stringify(populatedHospitals, null, 2));
 
         res.status(200).json({ hospitals: populatedHospitals });
     } catch (error) {
