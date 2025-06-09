@@ -149,7 +149,6 @@ export default function PatientDashBroad() {
         try {
             const response = await axios.get("https://mycarebridge.onrender.com/api/hospital/getall");
             
-            // Fetch doctors for each hospital
             const hospitalsWithDoctors = await Promise.all(
                 response.data.hospitals.map(async (hospital) => {
                     const doctors = await fetchHospitalDoctors(hospital);
