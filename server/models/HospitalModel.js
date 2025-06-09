@@ -54,12 +54,14 @@ const HospitalSchema = mongoose.Schema({
     timestamps: true
 });
 
+// Create 2dsphere index for geospatial queries
 HospitalSchema.index({ location: "2dsphere" });
 
+// Ensure coordinates are in the correct order [longitude, latitude]
 HospitalSchema.pre('save', function(next) {
     if (this.isModified('location.coordinates')) {
-      const [longitude, latitude] = this.location.coordinates;
-      this.location.coordinates = [longitude, latitude];
+        const [longitude, latitude] = this.location.coordinates;
+        this.location.coordinates = [longitude, latitude];
     }
     next();
 });

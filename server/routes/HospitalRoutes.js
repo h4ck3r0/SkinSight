@@ -3,11 +3,11 @@ import { createHospital, getHospitals, getHospital, updateHospital, deleteHospit
 const router = express.Router();
 
 router.post('/addhospital', createHospital);
+router.get('/getnearBy/:lat/:lng', GetnearBy);
 router.get('/getall', getHospitals);
-router.get('/getnearBy/:lat/:long', GetnearBy);
-router.post('/update/:id', updateHospital);
-router.post('/adddoctor/:id/:userId', addDoctor);
 router.get('/:id', getHospital);
+router.patch('/:id', updateHospital);
 router.delete('/:id', deleteHospital);
+router.post('/:id/doctors', addDoctor);
 
 export default router;
