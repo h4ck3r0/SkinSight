@@ -205,6 +205,14 @@ export async function GetnearBy(req, res) {
         const populatedHospitals = await Promise.all(
             hospitals.map(async (hospital) => {
                 console.log(`Populating doctors for hospital ${hospital._id}`);
+                
+                // Check if doctor profile exists
+                const doctorProfile = await DocterModel.findById(hospital.doctors[0]);
+                console.log("Doctor profile found:", doctorProfile ? "Yes" : "No");
+                if (doctorProfile) {
+                    console.log("Doctor profile details:", JSON.stringify(doctorProfile, null, 2));
+                }
+
                 const populatedHospital = await HospitalModel.findById(hospital._id)
                     .populate({
                         path: 'doctors',
