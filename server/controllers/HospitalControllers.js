@@ -59,15 +59,43 @@ export async function getHospitals(req,res){
 //patient-Np
 export async function getHospital(req,res){
     try{
-        const hospitalId=req.params.id;
-        const hospital=await HospitalModel.findById(hospitalId)
+        const hospitalId = req.params.id;
+        const hospital = await HospitalModel.findById(hospitalId)
+            .populate({
+                path: 'doctors',
+                model: 'DoctorProfile',
+                populate: {
+                    path: 'user',
+                    select: 'firstName lastName email'
+                }
+            });
+
         if(!hospital){
-            res.status(404).json({message:"No hospital found"})
+            return res.status(404).json({message:"No hospital found"});
         }
-        res.status(200).json({message:"Hospital found",hospital})
+
+        // Transform the doctors data
+        const transformedHospital = {
+            ...hospital.toObject(),
+            doctors: hospital.doctors.map(doctor => ({
+                _id: doctor._id,
+                name: `${doctor.user.firstName} ${doctor.user.lastName}`,
+                specialization: doctor.specialization,
+                experience: doctor.experience,
+                consultationFee: doctor.consultationFee,
+                languages: doctor.languages,
+                bio: doctor.bio,
+                availability: doctor.availability
+            }))
+        };
+
+        res.status(200).json({
+            message: "Hospital found",
+            hospital: transformedHospital
+        });
        
     }catch(err){
-        res.status(500).json({message:err.message})
+        res.status(500).json({message:err.message});
     }
 }
 //hospital-C
