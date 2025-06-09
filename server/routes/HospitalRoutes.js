@@ -11,6 +11,5 @@ router.delete('/:id', deleteHospital);
 router.post('/:id/doctors', addDoctor);
 router.post("/:id/addDoctor/:userId", addDoctor);
 router.get("/cleanup-doctors", cleanupInvalidDoctors);
-router.post("/:id/create-test-doctor", createTestDoctor);
 
 export default router;
