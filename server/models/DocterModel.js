@@ -141,14 +141,46 @@ DoctorProfileSchema.methods.isAvailableAt = function(date) {
   const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
   const time = date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
   
-  const availabilitySlot = this.availability.find(slot => 
-    slot.day === dayOfWeek && 
-    slot.isAvailable &&
-    time >= slot.startTime && 
-    time <= slot.endTime
-  );
+  console.log('Checking availability for:', { dayOfWeek, time });
+  console.log('Doctor availability:', this.availability);
   
-  return !!availabilitySlot;
+  // Find matching availability slot
+  const availabilitySlot = this.availability.find(slot => {
+    const isDayMatch = slot.day === dayOfWeek;
+    const isTimeInRange = time >= slot.startTime && time <= slot.endTime;
+    const isAvailable = slot.isAvailable;
+    
+    console.log('Checking slot:', {
+      slotDay: slot.day,
+      isDayMatch,
+      slotStart: slot.startTime,
+      slotEnd: slot.endTime,
+      isTimeInRange,
+      isAvailable
+    });
+    
+    return isDayMatch && isTimeInRange && isAvailable;
+  });
+  
+  if (!availabilitySlot) {
+    console.log('No matching availability slot found');
+    return false;
+  }
+  
+  // Check if the slot is already booked
+  const isBooked = this.appointments.some(appointment => {
+    const appointmentDate = new Date(appointment.date);
+    const appointmentDay = appointmentDate.toLocaleDateString('en-US', { weekday: 'long' });
+    const appointmentTime = appointment.startTime;
+    
+    return appointmentDay === dayOfWeek && 
+           appointmentTime === time && 
+           !appointment.isAvailable;
+  });
+  
+  console.log('Is slot booked:', isBooked);
+  
+  return !isBooked;
 };
 DoctorProfileSchema.methods.getNextAvailableSlot = function(fromDate = new Date()) {
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

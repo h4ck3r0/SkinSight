@@ -4,16 +4,26 @@ import DocterModel from "../models/DocterModel.js";
 export async function createAppointment(req, res) {
     try {
         const { doctor, patient, hospital, appointmentTime, reason, appointmentDate } = req.body;
+        console.log('Appointment request:', { doctor, patient, hospital, appointmentTime, appointmentDate, reason });
+        
         const doctorProfile = await DocterModel.findById(doctor);
         if (!doctorProfile) {
             return res.status(404).json({ message: "Doctor profile not found" });
         }
 
-        const appointmentDateTime = new Date(appointmentTime);
+        // Create a proper date object combining date and time
+        const [year, month, day] = appointmentDate.split('-').map(Number);
+        const [hours, minutes] = appointmentTime.split(':').map(Number);
+        const appointmentDateTime = new Date(year, month - 1, day, hours, minutes);
+        
+        console.log('Checking availability for:', appointmentDateTime);
+        
         if (!doctorProfile.isAvailableAt(appointmentDateTime)) {
+            const nextSlot = doctorProfile.getNextAvailableSlot(appointmentDateTime);
+            console.log('Next available slot:', nextSlot);
             return res.status(400).json({ 
                 message: "Doctor is not available at the requested time",
-                nextAvailableSlot: doctorProfile.getNextAvailableSlot(appointmentDateTime)
+                nextAvailableSlot: nextSlot
             });
         }
 
@@ -24,9 +34,10 @@ export async function createAppointment(req, res) {
         });
 
         if (existingAppointment) {
+            const nextSlot = doctorProfile.getNextAvailableSlot(appointmentDateTime);
             return res.status(400).json({ 
                 message: "Doctor already has an appointment at this time",
-                nextAvailableSlot: doctorProfile.getNextAvailableSlot(appointmentDateTime)
+                nextAvailableSlot: nextSlot
             });
         }
 
@@ -44,8 +55,8 @@ export async function createAppointment(req, res) {
 
         doctorProfile.appointments.push({
             date: new Date(appointmentDate),
-            startTime: appointmentDateTime.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
-            endTime: appointmentDateTime.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+            startTime: appointmentTime,
+            endTime: appointmentTime, // You might want to calculate this based on appointment duration
             isAvailable: false
         });
 
