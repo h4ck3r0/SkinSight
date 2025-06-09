@@ -48,25 +48,27 @@ export default function HospitalDoctors() {
         }
     };
 
-    const addDoctorToHospital = async (userId) => {
+    const addDoctorToHospital = async (doctorId) => {
         try {
-            setLoading(true);
-            await axios.post(
-                `https://mycarebridge.onrender.com/api/hospital/adddoctor/${hospitalId}/${userId}`,
+            const response = await axios.post(
+                `https://mycarebridge.onrender.com/api/hospital/${hospitalId}/addDoctor/${doctorId}`,
                 {},
                 {
                     headers: {
-                        Authorization: `Bearer ${token}`
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
                     }
                 }
             );
-            await fetchDoctors();
-            await fetchHospitalDoctors();
+            if (response.data) {
+                // Refresh the doctors list
+                fetchDoctors();
+                // Show success message
+                setError(null);
+                alert("Doctor added successfully!");
+            }
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to add doctor');
-            console.error('Error adding doctor:', err);
-        } finally {
-            setLoading(false);
+            console.error("Error adding doctor:", err);
+            setError(err.response?.data?.message || "Error adding doctor to hospital");
         }
     };
 

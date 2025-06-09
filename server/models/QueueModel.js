@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const QueueSchema = new mongoose.Schema({
     hospitalId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Hospital',
+        ref: 'HospitalProfile',
         required: true
     },
     doctorId: {

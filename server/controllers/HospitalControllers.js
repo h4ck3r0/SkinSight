@@ -196,52 +196,39 @@ export async function GetnearBy(req, res) {
                     $maxDistance: maxDistance * 1000 // Convert km to meters
                 }
             }
+        }).populate({
+            path: 'doctors',
+            model: 'DoctorProfile',
+            populate: {
+                path: 'user',
+                select: 'firstName lastName email'
+            }
         });
 
         console.log("Found hospitals:", hospitals.length);
-        console.log("Raw hospitals data:", JSON.stringify(hospitals, null, 2));
 
-        // Then populate doctors for each hospital
-        const populatedHospitals = await Promise.all(
-            hospitals.map(async (hospital) => {
-                console.log(`Populating doctors for hospital ${hospital._id}`);
-                
-                // Find all users with this hospitalId who are doctors
-                const users = await UserModel.find({ 
-                    hospitalId: hospital._id,
-                    role: 'doctor'
-                }).populate('hospitalId');
+        // Transform the hospitals data
+        const transformedHospitals = hospitals.map(hospital => {
+            const transformedDoctors = hospital.doctors.map(doctor => ({
+                _id: doctor._id,
+                name: `${doctor.user.firstName} ${doctor.user.lastName}`,
+                specialization: doctor.specialization,
+                experience: doctor.experience,
+                consultationFee: doctor.consultationFee,
+                languages: doctor.languages,
+                bio: doctor.bio,
+                availability: doctor.availability
+            }));
 
-                console.log(`Found ${users.length} doctors for hospital ${hospital._id}`);
+            return {
+                ...hospital.toObject(),
+                doctors: transformedDoctors
+            };
+        });
 
-                // Get doctor profiles for these users
-                const doctorProfiles = await DocterModel.find({
-                    user: { $in: users.map(u => u._id) }
-                }).populate('user', 'firstName lastName email');
+        console.log("Final transformed hospitals:", JSON.stringify(transformedHospitals, null, 2));
 
-                console.log(`Found ${doctorProfiles.length} doctor profiles`);
-
-                const transformedDoctors = doctorProfiles.map(doctor => ({
-                    _id: doctor._id,
-                    name: `${doctor.user.firstName} ${doctor.user.lastName}`,
-                    specialization: doctor.specialization,
-                    experience: doctor.experience,
-                    consultationFee: doctor.consultationFee,
-                    languages: doctor.languages,
-                    bio: doctor.bio,
-                    availability: doctor.availability
-                }));
-
-                return {
-                    ...hospital.toObject(),
-                    doctors: transformedDoctors
-                };
-            })
-        );
-
-        console.log("Final transformed hospitals:", JSON.stringify(populatedHospitals, null, 2));
-
-        res.status(200).json({ hospitals: populatedHospitals });
+        res.status(200).json({ hospitals: transformedHospitals });
     } catch (error) {
         console.error("Error in GetnearBy:", error);
         res.status(500).json({ message: "Error finding nearby hospitals", error: error.message });

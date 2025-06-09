@@ -13,7 +13,7 @@ const appointmentSchema=new mongoose.Schema({
     },
     hospital:{
         type:mongoose.Schema.Types.ObjectId,
-        ref:"Hospital",
+        ref:"HospitalProfile",
     },
     appointmentTime:{
         type:Date,required:true
