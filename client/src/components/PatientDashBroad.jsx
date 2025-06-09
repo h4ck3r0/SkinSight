@@ -55,11 +55,8 @@ export default function PatientDashBroad() {
         if (!hospital.doctors || !Array.isArray(hospital.doctors)) return [];
         
         try {
-            // Get all doctors at once
             const response = await axios.get("https://mycarebridge.onrender.com/api/doctors/getall");
             if (!response.data || !response.data.doctors) return [];
-
-            // Create a map of all doctors
             const allDoctors = response.data.doctors.reduce((acc, doctor) => {
                 acc[doctor._id] = {
                     _id: doctor._id,
@@ -75,10 +72,7 @@ export default function PatientDashBroad() {
                 return acc;
             }, {});
 
-            // Update doctorsMap with all doctors
             setDoctorsMap(allDoctors);
-
-            // Return only the doctors that belong to this hospital
             return hospital.doctors
                 .map(doctorId => allDoctors[doctorId])
                 .filter(doctor => doctor !== undefined);
@@ -118,8 +112,8 @@ export default function PatientDashBroad() {
             console.log("Raw lat:", location.lat, "Raw lng:", location.lng);
             
             // Convert coordinates to numbers and ensure they are valid
-            const lat = Number(location.lat);
-            const lng = Number(location.lng);
+            const lat = parseFloat(location.lat);
+            const lng = parseFloat(location.lng);
 
             console.log("Converted lat:", lat, "Converted lng:", lng);
 

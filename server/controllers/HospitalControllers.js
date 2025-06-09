@@ -107,8 +107,8 @@ export async function GetnearBy(req, res) {
         const maxDistance = 10; // 10 kilometers
 
         // Convert coordinates to numbers and validate
-        const latitude = Number(lat);
-        const longitude = Number(lng);
+        const latitude = parseFloat(lat);
+        const longitude = parseFloat(lng);
         
         console.log("Converted coordinates:", { latitude, longitude });
 
