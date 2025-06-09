@@ -256,12 +256,16 @@ export async function addDoctor(req, res) {
     try {
         const { userId } = req.params;
         const hospitalId = req.params.id;
+
+        // First find the hospital
         const hospital = await HospitalModel.findById(hospitalId);
         if (!hospital) {
             return res.status(404).json({
                 message: "No hospital found"
             });
         }
+
+        // Find the user and verify they are a doctor
         const user = await UserModel.findById(userId);
         if (!user) {
             return res.status(404).json({
@@ -282,27 +286,77 @@ export async function addDoctor(req, res) {
             });
         }
 
+        // Check if doctor is already in this hospital
         if (hospital.doctors.includes(doctorProfile._id)) {
             return res.status(400).json({
                 message: "Doctor already exists in this hospital"
             });
         }
 
+        // Add doctor to hospital
         hospital.doctors.push(doctorProfile._id);
         await hospital.save();
+
+        // Update user's hospitalId
         user.hospitalId = hospitalId;
         await user.save();
 
+        // Update doctor's hospital reference
+        doctorProfile.hospital = hospitalId;
+        await doctorProfile.save();
+
+        // Get the populated hospital data
+        const populatedHospital = await HospitalModel.findById(hospitalId)
+            .populate({
+                path: 'doctors',
+                model: 'DoctorProfile',
+                populate: {
+                    path: 'user',
+                    select: 'firstName lastName email'
+                }
+            });
+
         res.status(200).json({
             message: "Doctor added successfully to hospital",
-            hospital: hospital,
-            doctor: doctorProfile
+            hospital: populatedHospital
         });
 
     } catch (err) {
         console.error("AddDoctor error:", err);
         res.status(500).json({
             message: "Error adding doctor to hospital",
+            error: err.message
+        });
+    }
+}
+export async function cleanupInvalidDoctors(req, res) {
+    try {
+        const hospitals = await HospitalModel.find();
+        let cleanedCount = 0;
+
+        for (const hospital of hospitals) {
+            const validDoctors = [];
+            for (const doctorId of hospital.doctors) {
+                const doctorProfile = await DocterModel.findById(doctorId);
+                if (doctorProfile) {
+                    validDoctors.push(doctorId);
+                }
+            }
+
+            if (validDoctors.length !== hospital.doctors.length) {
+                hospital.doctors = validDoctors;
+                await hospital.save();
+                cleanedCount++;
+            }
+        }
+
+        res.status(200).json({
+            message: `Cleaned up invalid doctor references in ${cleanedCount} hospitals`
+        });
+    } catch (err) {
+        console.error("CleanupInvalidDoctors error:", err);
+        res.status(500).json({
+            message: "Error cleaning up invalid doctor references",
             error: err.message
         });
     }

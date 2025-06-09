@@ -6,6 +6,11 @@ const DoctorProfileSchema = new mongoose.Schema({
     required: true,
     unique: true, 
   },
+  hospital: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'HospitalProfile',
+    default: null
+  },
   specialization: {
     type: String,
     required: true,
