@@ -102,20 +102,28 @@ export async function deleteHospital(req,res){
 export async function GetnearBy(req, res) {
     try {
         const { lat, lng } = req.params;
+        console.log("Received coordinates:", { lat, lng });
+        
         const maxDistance = 10; // 10 kilometers
 
         // Convert coordinates to numbers and validate
         const latitude = Number(lat);
         const longitude = Number(lng);
+        
+        console.log("Converted coordinates:", { latitude, longitude });
 
         if (isNaN(latitude) || isNaN(longitude)) {
+            console.log("Invalid coordinates detected");
             return res.status(400).json({ message: "Invalid coordinates provided" });
         }
 
         // Validate coordinate ranges
         if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+            console.log("Coordinates out of range:", { latitude, longitude });
             return res.status(400).json({ message: "Coordinates out of valid range" });
         }
+
+        console.log("Querying with coordinates:", { latitude, longitude, maxDistance });
 
         const hospitals = await HospitalModel.find({
             location: {
@@ -134,6 +142,8 @@ export async function GetnearBy(req, res) {
                 select: 'firstName lastName email'
             }
         });
+
+        console.log("Found hospitals:", hospitals.length);
 
         // Transform the data to include complete doctor information
         const transformedHospitals = hospitals.map(hospital => {

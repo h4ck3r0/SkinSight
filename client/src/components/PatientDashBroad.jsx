@@ -24,10 +24,8 @@ export default function PatientDashBroad() {
     const [showAppointmentForm, setShowAppointmentForm] = useState(false);
     const [user, setUser] = useState(null);
 
-    // Function to fetch doctor details
     const fetchDoctorDetails = async (doctorId) => {
         try {
-            // Get all doctors and find the specific one
             const response = await axios.get("https://mycarebridge.onrender.com/api/doctors/getall");
             if (response.data && response.data.doctors) {
                 const doctor = response.data.doctors.find(d => d._id === doctorId);
@@ -116,11 +114,17 @@ export default function PatientDashBroad() {
             setLoading(true);
             setError(null);
             
+            console.log("Raw location values:", location);
+            console.log("Raw lat:", location.lat, "Raw lng:", location.lng);
+            
             // Convert coordinates to numbers and ensure they are valid
             const lat = Number(location.lat);
             const lng = Number(location.lng);
 
+            console.log("Converted lat:", lat, "Converted lng:", lng);
+
             if (isNaN(lat) || isNaN(lng)) {
+                console.log("Invalid coordinates detected");
                 setError("Invalid location coordinates");
                 return;
             }
@@ -128,6 +132,8 @@ export default function PatientDashBroad() {
             // Format coordinates to 6 decimal places to avoid floating point issues
             const formattedLat = lat.toFixed(6);
             const formattedLng = lng.toFixed(6);
+
+            console.log("Formatted coordinates:", formattedLat, formattedLng);
 
             const response = await axios.get(`https://mycarebridge.onrender.com/api/hospital/getnearBy/${formattedLat}/${formattedLng}`);
             
@@ -137,8 +143,8 @@ export default function PatientDashBroad() {
                 setHospitals([]);
             }
         } catch (err) {
+            console.error("Error details:", err);
             setError(err.response?.data?.message || "Failed to fetch nearby hospitals");
-            console.error("Error fetching hospitals:", err);
         } finally {
             setLoading(false);
         }
