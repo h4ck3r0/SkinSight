@@ -102,16 +102,19 @@ export async function deleteHospital(req,res){
 export async function GetnearBy(req, res) {
     try {
         const { lat, lng } = req.params;
-        const maxDistance = 10000; // 10km radius
+        const maxDistance = 10; // 10 kilometers
 
-        // Validate coordinates
-        const latitude = parseFloat(lat);
-        const longitude = parseFloat(lng);
+        // Convert coordinates to numbers and validate
+        const latitude = Number(lat);
+        const longitude = Number(lng);
 
         if (isNaN(latitude) || isNaN(longitude)) {
-            return res.status(400).json({
-                message: "Invalid coordinates provided"
-            });
+            return res.status(400).json({ message: "Invalid coordinates provided" });
+        }
+
+        // Validate coordinate ranges
+        if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+            return res.status(400).json({ message: "Coordinates out of valid range" });
         }
 
         const hospitals = await HospitalModel.find({
@@ -121,24 +124,20 @@ export async function GetnearBy(req, res) {
                         type: "Point",
                         coordinates: [longitude, latitude]
                     },
-                    $maxDistance: maxDistance
+                    $maxDistance: maxDistance * 1000 // Convert km to meters
                 }
             }
-        })
-        .populate({
+        }).populate({
             path: 'doctors',
             populate: {
                 path: 'user',
-                model: 'User',
                 select: 'firstName lastName email'
             }
-        })
-        .select('-__v');
+        });
 
         // Transform the data to include complete doctor information
-        const transformedHospitals = hospitals.map(hospital => ({
-            ...hospital.toObject(),
-            doctors: hospital.doctors.map(doctor => ({
+        const transformedHospitals = hospitals.map(hospital => {
+            const transformedDoctors = hospital.doctors.map(doctor => ({
                 _id: doctor._id,
                 name: `${doctor.user.firstName} ${doctor.user.lastName}`,
                 specialization: doctor.specialization,
@@ -147,19 +146,18 @@ export async function GetnearBy(req, res) {
                 languages: doctor.languages,
                 bio: doctor.bio,
                 availability: doctor.availability
-            }))
-        }));
+            }));
 
-        res.status(200).json({
-            message: "Hospitals found",
-            hospitals: transformedHospitals
+            return {
+                ...hospital.toObject(),
+                doctors: transformedDoctors
+            };
         });
-    } catch (err) {
-        console.error("GetNearBy error:", err);
-        res.status(500).json({
-            message: "Error finding nearby hospitals",
-            error: err.message
-        });
+
+        res.status(200).json({ hospitals: transformedHospitals });
+    } catch (error) {
+        console.error("Error in GetnearBy:", error);
+        res.status(500).json({ message: "Error finding nearby hospitals", error: error.message });
     }
 }
 //hospital-C

@@ -116,16 +116,20 @@ export default function PatientDashBroad() {
             setLoading(true);
             setError(null);
             
-            // Ensure coordinates are numbers
-            const lat = parseFloat(location.lat);
-            const lng = parseFloat(location.lng);
+            // Convert coordinates to numbers and ensure they are valid
+            const lat = Number(location.lat);
+            const lng = Number(location.lng);
 
             if (isNaN(lat) || isNaN(lng)) {
                 setError("Invalid location coordinates");
                 return;
             }
 
-            const response = await axios.get(`https://mycarebridge.onrender.com/api/hospital/getnearBy/${lat}/${lng}`);
+            // Format coordinates to 6 decimal places to avoid floating point issues
+            const formattedLat = lat.toFixed(6);
+            const formattedLng = lng.toFixed(6);
+
+            const response = await axios.get(`https://mycarebridge.onrender.com/api/hospital/getnearBy/${formattedLat}/${formattedLng}`);
             
             if (response.data && response.data.hospitals) {
                 setHospitals(response.data.hospitals);
