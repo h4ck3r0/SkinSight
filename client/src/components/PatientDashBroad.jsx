@@ -3,7 +3,7 @@ import { useGeolocation } from "../hooks/useGeolocation";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-export default function PatientDashBroad() {
+const PatientDashBroad = () => {
     const navigate = useNavigate();
     const { location, error: locationError } = useGeolocation();
     const [hospitals, setHospitals] = useState([]);
@@ -94,6 +94,7 @@ export default function PatientDashBroad() {
 
     useEffect(() => {
         if (location?.lat && location?.lng) {
+            console.log("Location updated:", location);
             GetnearByHospital();
         }
     }, [location]);
@@ -117,19 +118,35 @@ export default function PatientDashBroad() {
                 return;
             }
 
-            const formattedLat = lat.toFixed(6);
-            const formattedLng = lng.toFixed(6);
-
-            const response = await axios.get(`https://mycarebridge.onrender.com/api/hospital/getnearBy/${formattedLat}/${formattedLng}`);
+            console.log("Fetching nearby hospitals for:", { lat, lng });
+            const response = await axios.get(`https://mycarebridge.onrender.com/api/hospital/getnearBy/${lat}/${lng}`);
+            console.log("Nearby hospitals response:", response.data);
             
-            if (response.data && response.data.hospitals) {
+            if (response.data && response.data.hospitals && response.data.hospitals.length > 0) {
                 setHospitals(response.data.hospitals);
             } else {
-                setHospitals([]);
+                console.log("No nearby hospitals found, fetching all hospitals");
+                const allHospitalsResponse = await axios.get("https://mycarebridge.onrender.com/api/hospital/getall");
+                if (allHospitalsResponse.data && allHospitalsResponse.data.hospitals) {
+                    setHospitals(allHospitalsResponse.data.hospitals);
+                } else {
+                    setHospitals([]);
+                }
             }
         } catch (err) {
-            console.error("Error details:", err);
-            setError(err.response?.data?.message || "Failed to fetch nearby hospitals");
+            console.error("Error fetching nearby hospitals:", err);
+            // Only fetch all hospitals if nearby hospitals API fails
+            try {
+                const allHospitalsResponse = await axios.get("https://mycarebridge.onrender.com/api/hospital/getall");
+                if (allHospitalsResponse.data && allHospitalsResponse.data.hospitals) {
+                    setHospitals(allHospitalsResponse.data.hospitals);
+                } else {
+                    setHospitals([]);
+                }
+            } catch (fallbackErr) {
+                console.error("Error fetching all hospitals:", fallbackErr);
+                setError("Failed to fetch hospitals. Please try again later.");
+            }
         } finally {
             setLoading(false);
         }
@@ -138,8 +155,10 @@ export default function PatientDashBroad() {
     async function GetAllHospitals() {
         try {
             const response = await axios.get("https://mycarebridge.onrender.com/api/hospital/getall");
-            setAllHospitals(response.data.hospitals);
-            SetgetAll(!isgetAll);
+            if (response.data && response.data.hospitals) {
+                setAllHospitals(response.data.hospitals);
+                SetgetAll(!isgetAll);
+            }
         } catch (err) {
             console.log("Error fetching hospitals:", err);
             setError(err.response?.data?.message || "Failed to fetch hospitals");
@@ -159,14 +178,14 @@ export default function PatientDashBroad() {
         }
 
         try {
-            // Combine date and time into a single ISO string
-            const appointmentDateTime = new Date(`${selectedDate}T${selectedTime}`).toISOString();
-
+            console.log("Selected Doctor:", selectedDoctor);
+            
+            // Use the doctor ID directly since we already have it from the hospital data
             const response = await axios.post("https://mycarebridge.onrender.com/api/appointments/create", {
                 doctor: selectedDoctor._id,
                 patient: user._id,
                 hospital: selectedHospital._id,
-                appointmentTime: appointmentDateTime,
+                appointmentTime: selectedTime,
                 appointmentDate: selectedDate,
                 reason: appointmentReason
             }, {
@@ -188,7 +207,7 @@ export default function PatientDashBroad() {
                 alert("Appointment created successfully!");
             }
         } catch (err) {
-            console.log("Error creating appointment:", err);
+            console.error("Error creating appointment:", err);
             setError(err.response?.data?.message || "Failed to create appointment");
         }
     }
@@ -337,8 +356,18 @@ export default function PatientDashBroad() {
                                         className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         value={selectedDoctor?._id || ""}
                                         onChange={(e) => {
-                                            const doctor = selectedHospital.doctors.find(d => d._id === e.target.value);
-                                            setSelectedDoctor(doctor);
+                                            const doctorId = e.target.value;
+                                            if (!doctorId) {
+                                                setSelectedDoctor(null);
+                                                return;
+                                            }
+                                            const doctor = selectedHospital.doctors.find(d => d._id === doctorId);
+                                            console.log("Selected doctor:", doctor);
+                                            if (doctor) {
+                                                setSelectedDoctor(doctor);
+                                            } else {
+                                                setError("Doctor not found");
+                                            }
                                         }}
                                     >
                                         <option value="">Select a doctor</option>
@@ -409,4 +438,6 @@ export default function PatientDashBroad() {
             </div>
         </div>
     );
-}
+};
+
+export default PatientDashBroad;

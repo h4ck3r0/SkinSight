@@ -4,12 +4,11 @@ import DocterModel from "../models/DocterModel.js";
 export async function createAppointment(req, res) {
     try {
         const { doctor, patient, hospital, appointmentTime, reason, appointmentDate } = req.body;
-        const doctorProfile = await DocterModel.findOne({ user: doctor });
+        const doctorProfile = await DocterModel.findById(doctor);
         if (!doctorProfile) {
             return res.status(404).json({ message: "Doctor profile not found" });
         }
 
-        // Check if doctor is available at the requested time
         const appointmentDateTime = new Date(appointmentTime);
         if (!doctorProfile.isAvailableAt(appointmentDateTime)) {
             return res.status(400).json({ 
@@ -18,7 +17,6 @@ export async function createAppointment(req, res) {
             });
         }
 
-        // Check for existing appointments
         const existingAppointment = await Appointment.findOne({
             doctor,
             appointmentTime: appointmentDateTime,
@@ -44,7 +42,6 @@ export async function createAppointment(req, res) {
 
         await appointment.save();
 
-        // Update doctor's availability
         doctorProfile.appointments.push({
             date: new Date(appointmentDate),
             startTime: appointmentDateTime.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
