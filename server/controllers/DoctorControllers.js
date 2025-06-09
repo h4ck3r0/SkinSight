@@ -1,6 +1,7 @@
 import UserModel from "../models/UserModel.js";
 import Appointment from "../models/AppointmentModel.js";
 import DocterModel from "../models/DocterModel.js";
+import HospitalModel from "../models/HospitalModel.js";
 
 export async function createDoctorProfile(req, res) {
     try {
@@ -266,7 +267,7 @@ export async function getAllDoctors(req, res) {
                 path: 'user',
                 populate: {
                     path: 'hospitalId',
-                    model: 'Hospital',
+                    model: 'HospitalProfile',
                     select: 'name address phone email service'
                 }
             })

@@ -27,7 +27,7 @@ export default function HospitalSelection() {
 
     const joinHospital = async (hospitalId) => {
         try {
-            const updateResponse = await axios.put(
+            const updateResponse = await axios.patch(
                 'https://mycarebridge.onrender.com/api/auth/updateHospital', 
                 { hospitalId },
                 {
