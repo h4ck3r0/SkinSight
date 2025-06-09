@@ -159,11 +159,14 @@ export default function PatientDashBroad() {
         }
 
         try {
+            // Combine date and time into a single ISO string
+            const appointmentDateTime = new Date(`${selectedDate}T${selectedTime}`).toISOString();
+
             const response = await axios.post("https://mycarebridge.onrender.com/api/appointments/create", {
                 doctor: selectedDoctor._id,
                 patient: user._id,
                 hospital: selectedHospital._id,
-                appointmentTime: selectedTime,
+                appointmentTime: appointmentDateTime,
                 appointmentDate: selectedDate,
                 reason: appointmentReason
             }, {

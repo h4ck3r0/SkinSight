@@ -8,18 +8,20 @@ export async function createAppointment(req, res) {
         if (!doctorProfile) {
             return res.status(404).json({ message: "Doctor profile not found" });
         }
-        const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
-        
+
+        // Check if doctor is available at the requested time
+        const appointmentDateTime = new Date(appointmentTime);
         if (!doctorProfile.isAvailableAt(appointmentDateTime)) {
             return res.status(400).json({ 
                 message: "Doctor is not available at the requested time",
                 nextAvailableSlot: doctorProfile.getNextAvailableSlot(appointmentDateTime)
             });
         }
+
+        // Check for existing appointments
         const existingAppointment = await Appointment.findOne({
             doctor,
-            appointmentDate,
-            appointmentTime,
+            appointmentTime: appointmentDateTime,
             status: { $in: ['pending', 'confirmed'] }
         });
 
@@ -29,22 +31,24 @@ export async function createAppointment(req, res) {
                 nextAvailableSlot: doctorProfile.getNextAvailableSlot(appointmentDateTime)
             });
         }
+
         const appointment = new Appointment({
             doctor,
             patient,
             hospital,
-            appointmentTime,
+            appointmentTime: appointmentDateTime,
+            appointmentDate: new Date(appointmentDate),
             reason,
-            appointmentDate,
             status: 'pending'
         });
 
         await appointment.save();
 
+        // Update doctor's availability
         doctorProfile.appointments.push({
-            date: appointmentDate,
-            startTime: appointmentTime,
-            endTime: appointmentTime,
+            date: new Date(appointmentDate),
+            startTime: appointmentDateTime.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+            endTime: appointmentDateTime.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
             isAvailable: false
         });
 

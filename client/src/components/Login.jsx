@@ -15,11 +15,15 @@ export default function Login() {
             const credentials = { email, password }
             const response = await signin(credentials);
             console.log("Login successful:", response);
-            console.log(response.role);
+            
+            // Store user data in localStorage
+            localStorage.setItem('user', JSON.stringify(response));
+            
             if (!response.hospitalId && (response.role === "staff" || response.role === "doctor")) {
                 navigate('/hospital-selection');
                 return;
             }
+            
             if (response.role === "patient") {
                 navigate('/patient');
             } else if (response.role === "staff") {
