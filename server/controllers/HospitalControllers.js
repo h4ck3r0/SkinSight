@@ -210,7 +210,7 @@ export async function GetnearBy(req, res) {
                 const users = await UserModel.find({ 
                     hospitalId: hospital._id,
                     role: 'doctor'
-                });
+                }).populate('hospitalId');
 
                 console.log(`Found ${users.length} doctors for hospital ${hospital._id}`);
 
@@ -358,8 +358,8 @@ export async function cleanupInvalidDoctors(req, res) {
         for (const hospital of hospitals) {
             const validDoctors = [];
             for (const doctorId of hospital.doctors) {
-                const doctorProfile = await DocterModel.findById(doctorId);
-                if (doctorProfile) {
+                const doctor = await DocterModel.findById(doctorId);
+                if (doctor) {
                     validDoctors.push(doctorId);
                 }
             }
@@ -378,91 +378,6 @@ export async function cleanupInvalidDoctors(req, res) {
         console.error("CleanupInvalidDoctors error:", err);
         res.status(500).json({
             message: "Error cleaning up invalid doctor references",
-            error: err.message
-        });
-    }
-}
-export async function createTestDoctor(req, res) {
-    try {
-        const hospitalId = req.params.id;
-        const hospital = await HospitalModel.findById(hospitalId);
-        
-        if (!hospital) {
-            return res.status(404).json({ message: "Hospital not found" });
-        }
-
-        // Create a test user
-        const testUser = await UserModel.create({
-            email: "testdoctor@example.com",
-            password: "test123", // In production, this should be hashed
-            role: "doctor",
-            firstName: "John",
-            LastName: "Doe",
-            address: "123 Test St"
-        });
-
-        // Create a doctor profile
-        const doctorProfile = await DocterModel.create({
-            user: testUser._id,
-            specialization: "General Medicine",
-            qualifications: [{
-                degree: "MBBS",
-                institution: "Test Medical College",
-                year: 2020
-            }],
-            experience: 3,
-            consultationFee: 500,
-            availability: [
-                {
-                    day: "Monday",
-                    startTime: "09:00",
-                    endTime: "17:00",
-                    isAvailable: true
-                },
-                {
-                    day: "Tuesday",
-                    startTime: "09:00",
-                    endTime: "17:00",
-                    isAvailable: true
-                }
-            ],
-            languages: ["English", "Hindi"],
-            bio: "Experienced general physician with expertise in preventive care and chronic disease management.",
-            address: "123 Test St",
-            location: {
-                type: "Point",
-                coordinates: [77.5946, 12.9716]
-            }
-        });
-
-        // Add doctor to hospital
-        hospital.doctors.push(doctorProfile._id);
-        await hospital.save();
-
-        // Update user's hospitalId
-        testUser.hospitalId = hospitalId;
-        await testUser.save();
-
-        // Get populated hospital data
-        const populatedHospital = await HospitalModel.findById(hospitalId)
-            .populate({
-                path: 'doctors',
-                model: 'DoctorProfile',
-                populate: {
-                    path: 'user',
-                    select: 'firstName lastName email'
-                }
-            });
-
-        res.status(200).json({
-            message: "Test doctor created and added to hospital",
-            hospital: populatedHospital
-        });
-
-    } catch (err) {
-        console.error("CreateTestDoctor error:", err);
-        res.status(500).json({
-            message: "Error creating test doctor",
             error: err.message
         });
     }

@@ -262,40 +262,50 @@ export async function approveAppointment(req, res) {
 export async function getAllDoctors(req, res) {
     try {
         const doctors = await DocterModel.find()
-            .populate('user', 'firstName lastName email hospitalId')
             .populate({
                 path: 'user',
+                select: 'firstName lastName email hospitalId',
                 populate: {
                     path: 'hospitalId',
                     model: 'HospitalProfile',
                     select: 'name address phone email service'
                 }
-            })
-            .select('-__v');
+            });
 
-        // Transform the data to include hospital information
-        const transformedDoctors = doctors.map(doctor => ({
-            _id: doctor._id,
-            user: {
-                _id: doctor.user._id,
-                firstName: doctor.user.firstName,
-                lastName: doctor.user.lastName,
-                email: doctor.user.email,
-                hospitalId: doctor.user.hospitalId
-            },
-            specialization: doctor.specialization,
-            qualifications: doctor.qualifications,
-            experience: doctor.experience,
-            consultationFee: doctor.consultationFee,
-            availability: doctor.availability,
-            languages: doctor.languages,
-            bio: doctor.bio,
-            address: doctor.address,
-            location: doctor.location,
-            rating: doctor.rating,
-            totalRatings: doctor.totalRatings,
-            hospital: doctor.user.hospitalId // Include hospital details
-        }));
+        const transformedDoctors = doctors.map(doctor => {
+            // Get hospital data from user's hospitalId
+            const hospitalData = doctor.user.hospitalId ? {
+                _id: doctor.user.hospitalId._id,
+                name: doctor.user.hospitalId.name,
+                address: doctor.user.hospitalId.address,
+                phone: doctor.user.hospitalId.phone,
+                email: doctor.user.hospitalId.email,
+                service: doctor.user.hospitalId.service
+            } : null;
+
+            return {
+                _id: doctor._id,
+                user: {
+                    _id: doctor.user._id,
+                    firstName: doctor.user.firstName,
+                    lastName: doctor.user.lastName,
+                    email: doctor.user.email,
+                    hospitalId: doctor.user.hospitalId ? doctor.user.hospitalId._id : null
+                },
+                specialization: doctor.specialization,
+                qualifications: doctor.qualifications,
+                experience: doctor.experience,
+                consultationFee: doctor.consultationFee,
+                availability: doctor.availability,
+                languages: doctor.languages,
+                bio: doctor.bio,
+                address: doctor.address,
+                location: doctor.location,
+                rating: doctor.rating,
+                totalRatings: doctor.totalRatings,
+                hospital: hospitalData
+            };
+        });
 
         res.status(200).json({
             message: "Doctors retrieved successfully",

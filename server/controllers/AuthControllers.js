@@ -1,5 +1,7 @@
 import jwt from "jsonwebtoken"
 import UserModel from "../models/UserModel.js";
+import HospitalModel from "../models/HospitalModel.js";
+import DocterModel from "../models/DocterModel.js";
 
 export async function SignUp(req,res){
     try{
@@ -136,17 +138,86 @@ export async function UpdateMe(req, res) {
     }
 }
 
-export async function UpdateHospital(req,res){
-    try{
+export async function UpdateHospital(req, res) {
+    try {
+        const { id } = req.params;
+        const { hospitalId } = req.body;
 
-        const hospitalId = req.params.id;
+        // Find the user
+        const user = await UserModel.findById(id);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
 
-        const response=await UserModel.findOneAndUpdate({_id:user._id},req.body,{new:true});
-    }catch(err){
-        console.error("UpdateMe error:", err);
-        res.status(500).json({ 
-            message: "Failed to update user",
-            error: err.message 
+        // Verify user is a doctor
+        if (user.role !== "doctor") {
+            return res.status(400).json({ message: "User is not a doctor" });
+        }
+
+        // Find the hospital
+        const hospital = await HospitalModel.findById(hospitalId);
+        if (!hospital) {
+            return res.status(404).json({ message: "Hospital not found" });
+        }
+
+        // Check if doctor profile exists, if not create one
+        let doctorProfile = await DocterModel.findOne({ user: id });
+        if (!doctorProfile) {
+            console.log("Creating new doctor profile for user:", id);
+            doctorProfile = await DocterModel.create({
+                user: id,
+                specialization: "General Medicine", // Default specialization
+                qualifications: [],
+                experience: 0,
+                consultationFee: 500, // Default fee
+                availability: [
+                    {
+                        day: "Monday",
+                        startTime: "09:00",
+                        endTime: "17:00",
+                        isAvailable: true
+                    },
+                    {
+                        day: "Tuesday",
+                        startTime: "09:00",
+                        endTime: "17:00",
+                        isAvailable: true
+                    }
+                ],
+                languages: ["English"],
+                bio: "New doctor at " + hospital.name,
+                address: user.address || "",
+                location: hospital.location
+            });
+        }
+
+        // Update user's hospitalId
+        user.hospitalId = hospitalId;
+        await user.save();
+
+        // Add doctor to hospital's doctors array if not already there
+        if (!hospital.doctors.includes(doctorProfile._id)) {
+            hospital.doctors.push(doctorProfile._id);
+            await hospital.save();
+        }
+
+        res.status(200).json({
+            message: "Hospital updated successfully",
+            user: {
+                _id: user._id,
+                firstName: user.firstName,
+                lastName: user.LastName,
+                email: user.email,
+                role: user.role,
+                hospitalId: user.hospitalId
+            }
+        });
+
+    } catch (err) {
+        console.error("UpdateHospital error:", err);
+        res.status(500).json({
+            message: "Error updating hospital",
+            error: err.message
         });
     }
 }
