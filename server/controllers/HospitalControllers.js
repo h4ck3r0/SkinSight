@@ -104,12 +104,22 @@ export async function GetnearBy(req, res) {
         const { lat, lng } = req.params;
         const maxDistance = 10000; // 10km radius
 
+        // Validate coordinates
+        const latitude = parseFloat(lat);
+        const longitude = parseFloat(lng);
+
+        if (isNaN(latitude) || isNaN(longitude)) {
+            return res.status(400).json({
+                message: "Invalid coordinates provided"
+            });
+        }
+
         const hospitals = await HospitalModel.find({
             location: {
                 $near: {
                     $geometry: {
                         type: "Point",
-                        coordinates: [parseFloat(lng), parseFloat(lat)]
+                        coordinates: [longitude, latitude]
                     },
                     $maxDistance: maxDistance
                 }

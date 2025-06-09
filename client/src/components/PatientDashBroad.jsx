@@ -115,20 +115,23 @@ export default function PatientDashBroad() {
         try {
             setLoading(true);
             setError(null);
-            const response = await axios.get(`https://mycarebridge.onrender.com/api/hospital/getnearBy/${location.lat}/${location.lng}`);
             
-            // Fetch doctors for each hospital
-            const hospitalsWithDoctors = await Promise.all(
-                response.data.hospitals.map(async (hospital) => {
-                    const doctors = await fetchHospitalDoctors(hospital);
-                    return {
-                        ...hospital,
-                        doctors
-                    };
-                })
-            );
+            // Ensure coordinates are numbers
+            const lat = parseFloat(location.lat);
+            const lng = parseFloat(location.lng);
+
+            if (isNaN(lat) || isNaN(lng)) {
+                setError("Invalid location coordinates");
+                return;
+            }
+
+            const response = await axios.get(`https://mycarebridge.onrender.com/api/hospital/getnearBy/${lat}/${lng}`);
             
-            setHospitals(hospitalsWithDoctors);
+            if (response.data && response.data.hospitals) {
+                setHospitals(response.data.hospitals);
+            } else {
+                setHospitals([]);
+            }
         } catch (err) {
             setError(err.response?.data?.message || "Failed to fetch nearby hospitals");
             console.error("Error fetching hospitals:", err);
