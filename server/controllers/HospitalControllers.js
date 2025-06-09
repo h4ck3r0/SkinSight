@@ -250,43 +250,66 @@ export async function GetnearBy(req, res) {
 //hospital-C
 export async function addDoctor(req, res) {
     try {
-        const { userId } = req.params;
-        const hospitalId = req.params.id;
+        const { id: hospitalId, userId } = req.params;
+        console.log("Adding doctor to hospital:", { hospitalId, userId });
 
-        // First find the hospital
+        // Find hospital and user
         const hospital = await HospitalModel.findById(hospitalId);
-        if (!hospital) {
-            return res.status(404).json({
-                message: "No hospital found"
-            });
-        }
-
-        // Find the user and verify they are a doctor
         const user = await UserModel.findById(userId);
+
+        if (!hospital) {
+            console.log("Hospital not found:", hospitalId);
+            return res.status(404).json({ message: "Hospital not found" });
+        }
+
         if (!user) {
-            return res.status(404).json({
-                message: "User not found"
-            });
+            console.log("User not found:", userId);
+            return res.status(404).json({ message: "User not found" });
         }
+
+        // Verify user is a doctor
         if (user.role !== "doctor") {
-            return res.status(400).json({
-                message: "User is not a doctor"
-            });
+            console.log("User is not a doctor:", userId);
+            return res.status(400).json({ message: "User is not a doctor" });
         }
 
-        // Find the doctor's profile
-        const doctorProfile = await DocterModel.findOne({ user: userId });
+        // Check if doctor profile exists
+        let doctorProfile = await DocterModel.findOne({ user: userId });
+        
         if (!doctorProfile) {
-            return res.status(404).json({
-                message: "Doctor profile not found"
+            console.log("Creating new doctor profile for user:", userId);
+            // Create a new doctor profile
+            doctorProfile = await DocterModel.create({
+                user: userId,
+                specialization: "General Medicine", // Default specialization
+                qualifications: [],
+                experience: 0,
+                consultationFee: 500, // Default fee
+                availability: [
+                    {
+                        day: "Monday",
+                        startTime: "09:00",
+                        endTime: "17:00",
+                        isAvailable: true
+                    },
+                    {
+                        day: "Tuesday",
+                        startTime: "09:00",
+                        endTime: "17:00",
+                        isAvailable: true
+                    }
+                ],
+                languages: ["English"],
+                bio: "New doctor at " + hospital.name,
+                address: user.address || "",
+                location: hospital.location
             });
         }
 
-        // Check if doctor is already in this hospital
+        // Check if doctor is already in hospital
         if (hospital.doctors.includes(doctorProfile._id)) {
-            return res.status(400).json({
-                message: "Doctor already exists in this hospital"
-            });
+            console.log("Doctor already in hospital:", doctorProfile._id);
+            return res.status(400).json({ message: "Doctor already in hospital" });
         }
 
         // Add doctor to hospital
@@ -297,11 +320,7 @@ export async function addDoctor(req, res) {
         user.hospitalId = hospitalId;
         await user.save();
 
-        // Update doctor's hospital reference
-        doctorProfile.hospital = hospitalId;
-        await doctorProfile.save();
-
-        // Get the populated hospital data
+        // Get populated hospital data
         const populatedHospital = await HospitalModel.findById(hospitalId)
             .populate({
                 path: 'doctors',
@@ -312,8 +331,14 @@ export async function addDoctor(req, res) {
                 }
             });
 
+        console.log("Successfully added doctor to hospital:", {
+            hospitalId,
+            doctorId: doctorProfile._id,
+            userId
+        });
+
         res.status(200).json({
-            message: "Doctor added successfully to hospital",
+            message: "Doctor added to hospital successfully",
             hospital: populatedHospital
         });
 
