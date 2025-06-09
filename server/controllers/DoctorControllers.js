@@ -261,16 +261,24 @@ export async function approveAppointment(req, res) {
 
 export async function getAllDoctors(req, res) {
     try {
-        const doctors = await DocterModel.find()
-            .populate({
-                path: 'user',
-                select: 'firstName lastName email hospitalId',
-                populate: {
-                    path: 'hospitalId',
-                    model: 'HospitalProfile',
-                    select: 'name address phone email service'
-                }
-            });
+        // First find all users who are doctors
+        const doctorUsers = await UserModel.find({ role: 'doctor' });
+        console.log("Found doctor users:", doctorUsers.length);
+
+        // Then find all doctor profiles for these users
+        const doctors = await DocterModel.find({
+            user: { $in: doctorUsers.map(u => u._id) }
+        }).populate({
+            path: 'user',
+            select: 'firstName lastName email hospitalId',
+            populate: {
+                path: 'hospitalId',
+                model: 'HospitalProfile',
+                select: 'name address phone email service'
+            }
+        });
+
+        console.log("Found doctor profiles:", doctors.length);
 
         const transformedDoctors = doctors.map(doctor => {
             // Get hospital data from user's hospitalId
