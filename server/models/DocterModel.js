@@ -154,27 +154,64 @@ DoctorProfileSchema.methods.getNextAvailableSlot = function(fromDate = new Date(
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   let currentDate = new Date(fromDate);
   
-  for (let i = 0; i < 7; i++) {
+  // Check next 14 days for availability
+  for (let i = 0; i < 14; i++) {
     const dayOfWeek = days[currentDate.getDay()];
-    const availabilitySlot = this.availability.find(slot => 
+    const availabilitySlots = this.availability.filter(slot => 
       slot.day === dayOfWeek && 
       slot.isAvailable
     );
     
-    if (availabilitySlot) {
-      const [startHour, startMinute] = availabilitySlot.startTime.split(':');
-      const slotDate = new Date(currentDate);
-      slotDate.setHours(parseInt(startHour), parseInt(startMinute), 0, 0);
+    if (availabilitySlots.length > 0) {
+      // Sort slots by start time
+      availabilitySlots.sort((a, b) => a.startTime.localeCompare(b.startTime));
       
-      if (slotDate > fromDate) {
-        return slotDate;
+      for (const slot of availabilitySlots) {
+        const [startHour, startMinute] = slot.startTime.split(':');
+        const slotDate = new Date(currentDate);
+        slotDate.setHours(parseInt(startHour), parseInt(startMinute), 0, 0);
+        
+        if (slotDate > fromDate) {
+          // Check if this slot is already booked
+          const isBooked = this.appointments.some(appointment => {
+            const appointmentDate = new Date(appointment.date);
+            const appointmentTime = appointment.startTime;
+            return appointmentDate.toDateString() === slotDate.toDateString() && 
+                   appointmentTime === slot.startTime;
+          });
+          
+          if (!isBooked) {
+            return {
+              date: slotDate,
+              startTime: slot.startTime,
+              endTime: slot.endTime,
+              day: dayOfWeek
+            };
+          }
+        }
       }
     }
     
+    // Move to next day
     currentDate.setDate(currentDate.getDate() + 1);
+    currentDate.setHours(0, 0, 0, 0);
   }
   
-  return null;
+  // If no slots found, return the next available day with any slot
+  const nextAvailableDay = this.availability.find(slot => slot.isAvailable);
+  if (nextAvailableDay) {
+    return {
+      message: "No immediate slots available. Please check back later.",
+      nextAvailableDay: nextAvailableDay.day,
+      startTime: nextAvailableDay.startTime,
+      endTime: nextAvailableDay.endTime
+    };
+  }
+  
+  return {
+    message: "No available slots found in the next two weeks",
+    nextAvailableDay: null
+  };
 };
 
 const DocterModel= mongoose.model("DoctorProfile", DoctorProfileSchema);
