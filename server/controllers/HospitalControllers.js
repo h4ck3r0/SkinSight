@@ -206,26 +206,22 @@ export async function GetnearBy(req, res) {
             hospitals.map(async (hospital) => {
                 console.log(`Populating doctors for hospital ${hospital._id}`);
                 
-                // Check if doctor profile exists
-                const doctorProfile = await DocterModel.findById(hospital.doctors[0]);
-                console.log("Doctor profile found:", doctorProfile ? "Yes" : "No");
-                if (doctorProfile) {
-                    console.log("Doctor profile details:", JSON.stringify(doctorProfile, null, 2));
-                }
+                // Find all users with this hospitalId who are doctors
+                const users = await UserModel.find({ 
+                    hospitalId: hospital._id,
+                    role: 'doctor'
+                });
 
-                const populatedHospital = await HospitalModel.findById(hospital._id)
-                    .populate({
-                        path: 'doctors',
-                        model: 'DoctorProfile',
-                        populate: {
-                            path: 'user',
-                            select: 'firstName lastName email'
-                        }
-                    });
+                console.log(`Found ${users.length} doctors for hospital ${hospital._id}`);
 
-                console.log(`Hospital ${hospital._id} doctors:`, populatedHospital.doctors);
+                // Get doctor profiles for these users
+                const doctorProfiles = await DocterModel.find({
+                    user: { $in: users.map(u => u._id) }
+                }).populate('user', 'firstName lastName email');
 
-                const transformedDoctors = populatedHospital.doctors.map(doctor => ({
+                console.log(`Found ${doctorProfiles.length} doctor profiles`);
+
+                const transformedDoctors = doctorProfiles.map(doctor => ({
                     _id: doctor._id,
                     name: `${doctor.user.firstName} ${doctor.user.lastName}`,
                     specialization: doctor.specialization,
@@ -237,7 +233,7 @@ export async function GetnearBy(req, res) {
                 }));
 
                 return {
-                    ...populatedHospital.toObject(),
+                    ...hospital.toObject(),
                     doctors: transformedDoctors
                 };
             })
