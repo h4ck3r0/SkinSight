@@ -1,8 +1,8 @@
-const { Server } = require('socket.io');
+import { Server } from 'socket.io';
 import jwt from "jsonwebtoken";
 import Queue from "./models/QueueModel.js";
 
-const SetupSocket = (server) => {
+export const SetupSocket = (server) => {
     const io = new Server(server, {
         cors: {
             origin: [
@@ -149,5 +149,3 @@ const SetupSocket = (server) => {
 
     return io;
 };
-
-module.exports = SetupSocket;
