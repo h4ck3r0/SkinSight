@@ -161,29 +161,27 @@ export async function deleteHospital(req,res){
 //patient-C
 export async function GetnearBy(req, res) {
     try {
-        const { lat, lng } = req.params;
-        console.log("Received coordinates:", { lat, lng });
+        const { latitude, longitude, radius = 10 } = req.query;
+        console.log("Received coordinates:", { latitude, longitude });
         
-        const maxDistance = 10; // 10 kilometers
-
         // Convert coordinates to numbers and validate
-        const latitude = parseFloat(lat);
-        const longitude = parseFloat(lng);
+        const lat = parseFloat(latitude);
+        const lng = parseFloat(longitude);
         
-        console.log("Converted coordinates:", { latitude, longitude });
+        console.log("Converted coordinates:", { lat, lng });
 
-        if (isNaN(latitude) || isNaN(longitude)) {
+        if (isNaN(lat) || isNaN(lng)) {
             console.log("Invalid coordinates detected");
             return res.status(400).json({ message: "Invalid coordinates provided" });
         }
 
         // Validate coordinate ranges
-        if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-            console.log("Coordinates out of range:", { latitude, longitude });
+        if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            console.log("Coordinates out of range:", { lat, lng });
             return res.status(400).json({ message: "Coordinates out of valid range" });
         }
 
-        console.log("Querying with coordinates:", { latitude, longitude, maxDistance });
+        console.log("Querying with coordinates:", { lat, lng, radius });
 
         // First find the hospitals
         const hospitals = await HospitalModel.find({
@@ -191,9 +189,9 @@ export async function GetnearBy(req, res) {
                 $near: {
                     $geometry: {
                         type: "Point",
-                        coordinates: [longitude, latitude]
+                        coordinates: [lng, lat]
                     },
-                    $maxDistance: maxDistance * 1000 // Convert km to meters
+                    $maxDistance: radius * 1000 // Convert km to meters
                 }
             }
         }).populate({
@@ -228,10 +226,17 @@ export async function GetnearBy(req, res) {
 
         console.log("Final transformed hospitals:", JSON.stringify(transformedHospitals, null, 2));
 
-        res.status(200).json({ hospitals: transformedHospitals });
+        res.status(200).json({ 
+            success: true,
+            data: transformedHospitals 
+        });
     } catch (error) {
         console.error("Error in GetnearBy:", error);
-        res.status(500).json({ message: "Error finding nearby hospitals", error: error.message });
+        res.status(500).json({ 
+            success: false,
+            message: "Error finding nearby hospitals", 
+            error: error.message 
+        });
     }
 }
 //hospital-C

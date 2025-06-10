@@ -1,15 +1,20 @@
 import express from "express"
-import { createHospital, getHospitals, getHospital, updateHospital, deleteHospital, GetnearBy, addDoctor, cleanupInvalidDoctors } from "../controllers/HospitalControllers.js";
+import { createHospital, getHospitals, getHospital, updateHospital, deleteHospital, GetnearBy, addDoctor, removeDoctor, cleanupInvalidDoctors } from "../controllers/HospitalControllers.js";
+import { middleware } from '../middleware/middleware.js';
+
 const router = express.Router();
 
-router.post('/addhospital', createHospital);
-router.get('/getnearBy/:lat/:lng', GetnearBy);
-router.get('/getall', getHospitals);
+// Public routes
+router.get('/nearby', GetnearBy);
+router.get('/', getHospitals);
 router.get('/:id', getHospital);
-router.patch('/:id', updateHospital);
-router.delete('/:id', deleteHospital);
-router.post('/:id/doctors', addDoctor);
-router.post("/:id/addDoctor/:userId", addDoctor);
-router.get("/cleanup-doctors", cleanupInvalidDoctors);
+
+// Protected routes
+router.post('/', middleware, createHospital);
+router.put('/:id', middleware, updateHospital);
+router.delete('/:id', middleware, deleteHospital);
+router.post('/:id/doctors/:userId', middleware, addDoctor);
+router.delete('/:id/doctors/:userId', middleware, removeDoctor);
+router.post('/cleanup', middleware, cleanupInvalidDoctors);
 
 export default router;

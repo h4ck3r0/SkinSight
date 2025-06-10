@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { io } from "socket.io-client";
 import axios from "axios";
+import useSocket from "../hooks/useSocket";
 
 const socket = io("https://mycarebridge.onrender.com");
 
@@ -9,61 +10,60 @@ export default function QueueSystem({ doctorId, hospitalId, userRole }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [currentPatient, setCurrentPatient] = useState(null);
+    const [queueStatus, setQueueStatus] = useState(null);
+    const socket = useSocket();
 
     useEffect(() => {
-        // Join queue room
-        socket.emit("join_queue_room", doctorId);
+        const fetchQueueStatus = async () => {
+            if (!doctorId || !hospitalId) return;
 
-        // Listen for queue updates
-        socket.on(`queue:${doctorId}`, (data) => {
-            console.log("Queue update received:", data);
-            switch (data.type) {
-                case "queue_started":
-                case "patient_joined":
-                case "queue_ended":
-                    setQueue(data.queue);
-                    break;
-                case "next_patient":
-                    setQueue(data.queue);
-                    setCurrentPatient(data.currentPatient);
-                    break;
-                case "consultation_completed":
-                    setQueue(data.queue);
-                    setCurrentPatient(null);
-                    break;
-                default:
-                    console.log("Unknown queue event type:", data.type);
+            setLoading(true);
+            setError(null);
+            try {
+                const response = await axios.get(`${API_URL}/api/queue/status`, {
+                    params: {
+                        doctorId: doctorId,
+                        hospitalId: hospitalId
+                    }
+                });
+                setQueueStatus(response.data.data);
+            } catch (err) {
+                console.error("Error fetching queue status:", err);
+                setError(err.response?.data?.message || "Error fetching queue status");
+            } finally {
+                setLoading(false);
             }
-        });
+        };
 
-        // Initial queue status fetch
         fetchQueueStatus();
 
-        return () => {
-            socket.emit("leave_queue_room", doctorId);
-            socket.off(`queue:${doctorId}`);
-        };
-    }, [doctorId]);
-
-    const fetchQueueStatus = async () => {
-        try {
-            setLoading(true);
-            const response = await axios.get(
-                `https://mycarebridge.onrender.com/api/queue/status/${doctorId}/${hospitalId}`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                }
-            );
-            setQueue(response.data.queue);
-        } catch (err) {
-            console.error("Error fetching queue status:", err);
-            setError(err.response?.data?.message || "Error fetching queue status");
-        } finally {
-            setLoading(false);
+        // Join queue room
+        if (socket && doctorId && hospitalId) {
+            socket.emit('joinQueue', {
+                doctorId: doctorId,
+                hospitalId: hospitalId
+            });
         }
-    };
+
+        // Listen for queue updates
+        if (socket) {
+            socket.on('queueUpdate', (data) => {
+                setQueueStatus(data.queue);
+            });
+        }
+
+        return () => {
+            if (socket) {
+                socket.off('queueUpdate');
+                if (doctorId && hospitalId) {
+                    socket.emit('leaveQueue', {
+                        doctorId: doctorId,
+                        hospitalId: hospitalId
+                    });
+                }
+            }
+        };
+    }, [doctorId, hospitalId, socket]);
 
     const startQueue = async () => {
         try {
