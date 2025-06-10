@@ -126,7 +126,7 @@ const PatientDashBroad = () => {
             const time = "09:00";
 
             const response = await axios.post(
-                `${API_URL}/appointment/create`,
+                `${API_URL}/appointments/create`,
                 {
                     doctor: doctor._id,
                     patient: user._id,
