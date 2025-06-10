@@ -98,55 +98,77 @@ const PatientDashBroad = () => {
     }, [navigate]);
 
     useEffect(() => {
-        if (location?.lat && location?.lng) {
+        if (location) {
             console.log("Location updated:", location);
             GetnearByHospital();
         }
     }, [location]);
 
-    async function GetnearByHospital() {
-        if (!location?.lat || !location?.lng) {
-            console.log("Location not available:", location);
-            setError("Location not available. Please ensure location access is enabled.");
-            return;
-        }
-
+    const GetnearByHospital = async () => {
         try {
             setLoading(true);
             setError(null);
             
-            const lat = parseFloat(location.lat);
-            const lng = parseFloat(location.lng);
+            if (!location?.lat || !location?.lng) {
+                console.log("Location not available:", location);
+                setError("Location not available. Please ensure location access is enabled.");
+                return;
+            }
 
-            if (isNaN(lat) || isNaN(lng)) {
+            const latitude = parseFloat(location.lat);
+            const longitude = parseFloat(location.lng);
+
+            if (isNaN(latitude) || isNaN(longitude)) {
                 setError("Invalid location coordinates. Please try refreshing the page.");
                 return;
             }
 
-            console.log("Fetching nearby hospitals for:", { lat, lng });
-            const response = await axios.get(`https://mycarebridge.onrender.com/api/hospital/nearby/${lat}/${lng}`);
-            console.log("Nearby hospitals response:", response.data);
-            
-            if (response.data && response.data.hospitals && response.data.hospitals.length > 0) {
-                setHospitals(response.data.hospitals);
-            } else {
-                console.log("No nearby hospitals found, fetching all hospitals");
-                const allHospitalsResponse = await axios.get("https://mycarebridge.onrender.com/api/hospital");
-                if (allHospitalsResponse.data && allHospitalsResponse.data.hospitals) {
-                    setHospitals(allHospitalsResponse.data.hospitals);
-                } else {
-                    setHospitals([]);
+            console.log("Fetching nearby hospitals for:", { latitude, longitude });
+            const response = await axios.get(
+                `https://mycarebridge.onrender.com/api/hospital/nearby/${latitude}/${longitude}`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
                 }
+            );
+
+            if (response.data && response.data.hospitals) {
+                setHospitals(response.data.hospitals);
+                
+                // Create doctors map for all hospitals
+                const doctorsMap = {};
+                response.data.hospitals.forEach(hospital => {
+                    if (hospital.doctors && Array.isArray(hospital.doctors)) {
+                        doctorsMap[hospital._id] = hospital.doctors;
+                    }
+                });
+                setDoctorsMap(doctorsMap);
             }
         } catch (err) {
             console.error("Error fetching nearby hospitals:", err);
-            // Only fetch all hospitals if nearby hospitals API fails
+            setError(err.response?.data?.message || "Failed to fetch nearby hospitals");
+            // Fallback to getting all hospitals if nearby fails
             try {
-                const allHospitalsResponse = await axios.get("https://mycarebridge.onrender.com/api/hospital");
+                const allHospitalsResponse = await axios.get(
+                    "https://mycarebridge.onrender.com/api/hospital",
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('token')}`
+                        }
+                    }
+                );
                 if (allHospitalsResponse.data && allHospitalsResponse.data.hospitals) {
                     setHospitals(allHospitalsResponse.data.hospitals);
-                } else {
-                    setHospitals([]);
+                    
+                    // Create doctors map for all hospitals
+                    const doctorsMap = {};
+                    allHospitalsResponse.data.hospitals.forEach(hospital => {
+                        if (hospital.doctors && Array.isArray(hospital.doctors)) {
+                            doctorsMap[hospital._id] = hospital.doctors;
+                        }
+                    });
+                    setDoctorsMap(doctorsMap);
                 }
             } catch (fallbackErr) {
                 console.error("Error fetching all hospitals:", fallbackErr);
@@ -155,20 +177,39 @@ const PatientDashBroad = () => {
         } finally {
             setLoading(false);
         }
-    }
+    };
 
-    async function GetAllHospitals() {
+    const GetAllHospitals = async () => {
         try {
-            const response = await axios.get("https://mycarebridge.onrender.com/api/hospital");
+            setLoading(true);
+            setError(null);
+            const response = await axios.get(
+                "https://mycarebridge.onrender.com/api/hospital",
+                {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                }
+            );
+
             if (response.data && response.data.hospitals) {
                 setAllHospitals(response.data.hospitals);
-                SetgetAll(!isgetAll);
+                // Create doctors map for all hospitals
+                const doctorsMap = {};
+                response.data.hospitals.forEach(hospital => {
+                    if (hospital.doctors && Array.isArray(hospital.doctors)) {
+                        doctorsMap[hospital._id] = hospital.doctors;
+                    }
+                });
+                setDoctorsMap(prevMap => ({ ...prevMap, ...doctorsMap }));
             }
         } catch (err) {
-            console.log("Error fetching hospitals:", err);
-            setError(err.response?.data?.message || "Failed to fetch hospitals");
+            console.error("Error fetching all hospitals:", err);
+            setError(err.response?.data?.message || "Failed to fetch all hospitals");
+        } finally {
+            setLoading(false);
         }
-    }
+    };
 
     async function createAppointCall() {
         if (!user) {
@@ -302,85 +343,63 @@ const PatientDashBroad = () => {
             </div>
 
             {activeTab === 'hospitals' ? (
-                <div className="max-w-7xl mx-auto">
-                    <div className="mb-8">
-                        <input 
-                            className="w-full px-4 py-2 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Search hospitals by name, address, city, state, or doctor..."
-                            value={searchedTerm}
-                            onChange={(e) => {
-                                SetSearchedTerm(e.target.value);
-                                setShowSearchResults(e.target.value.length > 0);
-                            }}
-                        />
+                <div className="space-y-6">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="mb-8">
+                            <input 
+                                className="w-full px-4 py-2 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Search hospitals by name, address, city, state, or doctor..."
+                                value={searchedTerm}
+                                onChange={(e) => {
+                                    SetSearchedTerm(e.target.value);
+                                    setShowSearchResults(e.target.value.length > 0);
+                                }}
+                            />
+                        </div>
+
+                        {loading && (
+                            <div className="text-center py-4">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
+                                <p className="mt-2">Loading hospitals...</p>
+                            </div>
+                        )}
+                        
+                        {error && (
+                            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+                                {error}
+                            </div>
+                        )}
+
+                        {!loading && !error && hospitals.length === 0 && (
+                            <div className="text-center py-4">
+                                No hospitals found nearby
+                            </div>
+                        )}
                     </div>
 
-                    {loading && (
-                        <div className="text-center py-4">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
-                            <p className="mt-2">Loading hospitals...</p>
-                        </div>
-                    )}
-                    
-                    {error && (
-                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
-                            {error}
-                        </div>
-                    )}
-
-                    {!loading && !error && hospitals.length === 0 && (
-                        <div className="text-center py-4">
-                            No hospitals found nearby
-                        </div>
-                    )}
-
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {(showSearchResults ? filterHospitals : hospitals).map((hospital) => (
-                            <div key={hospital._id} className="bg-white text-gray-800 rounded-lg shadow-lg overflow-hidden">
-                                <div className="p-6">
-                                    <h3 className="text-xl font-bold mb-2">{hospital.name}</h3>
-                                    <p className="text-gray-600 mb-2">{hospital.address}</p>
-                                    <p className="text-gray-600 mb-2">Phone: {hospital.phone}</p>
-                                    <p className="text-gray-600 mb-4">Services: {hospital.service.join(", ")}</p>
-                                    
-                                    <div className="mb-4">
-                                        <h4 className="font-semibold mb-2">Available Doctors:</h4>
-                                        {hospital.doctors && hospital.doctors.length > 0 ? (
-                                            <ul className="space-y-3">
-                                                {hospital.doctors.map((doctor, index) => (
-                                                    <li key={doctor._id || index} className="bg-gray-50 p-3 rounded">
-                                                        <div className="font-medium">{doctor.name}</div>
-                                                        <div className="text-sm text-gray-600">
-                                                            <span className="font-medium">Specialization:</span> {doctor.specialization}
-                                                        </div>
-                                                        <div className="text-sm text-gray-600">
-                                                            <span className="font-medium">Experience:</span> {doctor.experience} years
-                                                        </div>
-                                                        <div className="text-sm text-gray-600">
-                                                            <span className="font-medium">Consultation Fee:</span> ₹{doctor.consultationFee}
-                                                        </div>
-                                                        {doctor.languages && doctor.languages.length > 0 && (
-                                                            <div className="text-sm text-gray-600">
-                                                                <span className="font-medium">Languages:</span> {doctor.languages.join(", ")}
-                                                            </div>
-                                                        )}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        ) : (
-                                            <p className="text-gray-500 italic">No doctors available</p>
-                                        )}
-                                    </div>
-
-                                    <button 
-                                        onClick={() => {
-                                            setSelectedHospital(hospital);
-                                            setShowAppointmentForm(true);
-                                        }}
-                                        className="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-                                    >
-                                        Book Appointment
-                                    </button>
+                        {hospitals.map((hospital) => (
+                            <div key={hospital._id} className="bg-white rounded-lg shadow-lg p-6">
+                                <h3 className="text-xl font-bold text-gray-900 mb-2">{hospital.name}</h3>
+                                <p className="text-gray-600 mb-2">{hospital.address}</p>
+                                {hospital.location && hospital.location.coordinates && (
+                                    <p className="text-gray-600 mb-2">
+                                        Location: {hospital.location.coordinates[1].toFixed(4)}, {hospital.location.coordinates[0].toFixed(4)}
+                                    </p>
+                                )}
+                                <div className="mt-4">
+                                    <h4 className="font-semibold text-gray-900 mb-2">Doctors:</h4>
+                                    {hospital.doctors && hospital.doctors.length > 0 ? (
+                                        <ul className="space-y-2">
+                                            {hospital.doctors.map((doctor) => (
+                                                <li key={doctor._id} className="text-gray-600">
+                                                    {doctor.name} - {doctor.specialization}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-gray-500">No doctors available</p>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -539,10 +558,48 @@ const PatientDashBroad = () => {
                         <QueueSystem
                             doctorId={selectedDoctor._id}
                             hospitalId={selectedHospital._id}
-                            userRole="patient"
+                            role="patient"
                         />
                     ) : (
-                        <p className="text-gray-500">Please select a doctor and hospital to view queue status</p>
+                        <div className="text-center py-8">
+                            <p className="text-gray-500 mb-4">Please select a doctor and hospital to view queue status</p>
+                            <div className="flex flex-col space-y-4 max-w-md mx-auto">
+                                <select
+                                    className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-900"
+                                    onChange={(e) => {
+                                        const hospital = allHospitalsList.find(h => h._id === e.target.value);
+                                        setSelectedHospital(hospital);
+                                        setSelectedDoctor(null);
+                                    }}
+                                    value={selectedHospital?._id || ''}
+                                >
+                                    <option key="default-hospital" value="">Select Hospital</option>
+                                    {allHospitalsList.map((hospital, index) => (
+                                        <option key={`hospital-${hospital._id || index}-${hospital.name}`} value={hospital._id}>
+                                            {hospital.name}
+                                        </option>
+                                    ))}
+                                </select>
+
+                                {selectedHospital && doctorsMap[selectedHospital._id] && (
+                                    <select
+                                        className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-900"
+                                        onChange={(e) => {
+                                            const doctor = doctorsMap[selectedHospital._id].find(d => d._id === e.target.value);
+                                            setSelectedDoctor(doctor);
+                                        }}
+                                        value={selectedDoctor?._id || ''}
+                                    >
+                                        <option key="default-doctor" value="">Select Doctor</option>
+                                        {doctorsMap[selectedHospital._id].map((doctor, index) => (
+                                            <option key={`doctor-${doctor._id || index}-${doctor.name}`} value={doctor._id}>
+                                                {doctor.name} - {doctor.specialization}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
+                            </div>
+                        </div>
                     )}
                 </div>
             )}

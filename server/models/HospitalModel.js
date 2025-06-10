@@ -59,6 +59,9 @@ HospitalSchema.index({ location: "2dsphere" });
 HospitalSchema.pre('save', function(next) {
     if (this.isModified('location.coordinates')) {
         const [longitude, latitude] = this.location.coordinates;
+        if (longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) {
+            return next(new Error('Invalid coordinates'));
+        }
         this.location.coordinates = [longitude, latitude];
     }
     next();

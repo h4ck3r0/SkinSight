@@ -124,13 +124,15 @@ export const GetnearBy = async (req, res) => {
             });
         }
 
+        console.log("Searching for hospitals near:", { latitude, longitude });
+
         // Find hospitals within 10km using MongoDB's $near operator
         const hospitals = await HospitalModel.find({
             location: {
                 $near: {
                     $geometry: {
                         type: "Point",
-                        coordinates: [longitude, latitude]
+                        coordinates: [longitude, latitude] // MongoDB expects [longitude, latitude]
                     },
                     $maxDistance: 10000 // 10km in meters
                 }
@@ -139,6 +141,8 @@ export const GetnearBy = async (req, res) => {
             path: 'doctors',
             select: 'firstName lastName specialization experience consultationFee languages bio availability'
         });
+
+        console.log("Found hospitals:", hospitals.length);
 
         res.status(200).json({
             success: true,
