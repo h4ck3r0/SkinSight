@@ -5,7 +5,7 @@ import { middleware } from '../middleware/middleware.js';
 const router = express.Router();
 
 // Public routes
-router.get('/nearby', GetnearBy);
+router.get('/nearby/:lat/:lng', GetnearBy);
 router.get('/', getHospitals);
 router.get('/:id', getHospital);
 

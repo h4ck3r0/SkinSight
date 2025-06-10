@@ -194,3 +194,26 @@ export async function getDoctorAppointments(req, res) {
         });
     }
 }
+
+export const getPatientAppointments = async (req, res) => {
+    try {
+        const { patientId } = req.params;
+        
+        const appointments = await Appointment.find({ patient: patientId })
+            .populate('doctor', 'firstName lastName specialization')
+            .populate('hospital', 'name address')
+            .sort({ appointmentDate: 1, appointmentTime: 1 });
+
+        res.status(200).json({
+            success: true,
+            appointments
+        });
+    } catch (error) {
+        console.error('Error fetching patient appointments:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch appointments',
+            error: error.message
+        });
+    }
+};

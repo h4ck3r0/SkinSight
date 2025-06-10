@@ -1,432 +1,149 @@
-import { useEffect, useState } from "react";
-import axios from "axios";
-import { useNavigate } from "react-router-dom";
-import QueueSystem from "./QueueSystem";
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
+import QueueSystem from './QueueSystem';
+import axios from 'axios';
 import { toast } from 'react-hot-toast';
 
-export default function DoctorDashboard() {
-    const navigate = useNavigate();
+const DoctorDashboard = () => {
     const { user } = useAuth();
-    const { socket } = useSocket();
     const [doctorProfile, setDoctorProfile] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [activeTab, setActiveTab] = useState('profile'); // 'profile' or 'appointments' or 'queue'
-    const [appointments, setAppointments] = useState([]);
-    const [currentQueue, setCurrentQueue] = useState([]);
-    const [activePatients, setActivePatients] = useState([]);
-    const [formData, setFormData] = useState({
-        specialization: "",
-        experience: "",
-        consultationFee: "",
-        bio: "",
-        qualifications: [{
-            degree: "",
-            institution: "",
-            year: ""
-        }],
-        languages: ["English"],
-        availability: [
-            {
-                day: "Monday",
-                startTime: "09:00",
-                endTime: "17:00",
-                isAvailable: true
-            },
-            {
-                day: "Tuesday",
-                startTime: "09:00",
-                endTime: "17:00",
-                isAvailable: true
-            }
-        ],
-        address: "",
-        location: {
-            type: "Point",
-            coordinates: [0, 0]
-        }
-    });
-    const [hospitals, setHospitals] = useState([]);
-    const [selectedHospital, setSelectedHospital] = useState(null);
 
     useEffect(() => {
-        if (!user) {
-            navigate('/login');
-            return;
+        if (user?._id) {
+            fetchDoctorProfile();
         }
-
-        if (user.role !== 'doctor') {
-            navigate('/login');
-            return;
-        }
-
-        fetchAppointments();
-        fetchDoctorProfile();
-        fetchHospitals();
-    }, [user, navigate]);
-
-    useEffect(() => {
-        if (!socket || !user) return;
-
-        // Join doctor's room
-        socket.emit('joinRoom', { userId: user._id });
-
-        // Listen for queue updates
-        socket.on('queueUpdate', (data) => {
-            if (data.doctorId === user._id) {
-                setCurrentQueue(data.queue);
-            }
-        });
-
-        // Listen for patient called events
-        socket.on('patientCalled', (data) => {
-            if (data.doctorId === user._id) {
-                setActivePatients(prev => [...prev, data.patient]);
-            }
-        });
-
-        // Listen for consultation complete events
-        socket.on('consultationComplete', (data) => {
-            if (data.doctorId === user._id) {
-                setActivePatients(prev => prev.filter(p => p._id !== data.patientId));
-            }
-        });
-
-        return () => {
-            socket.off('queueUpdate');
-            socket.off('patientCalled');
-            socket.off('consultationComplete');
-        };
-    }, [socket, user]);
+    }, [user]);
 
     const fetchDoctorProfile = async () => {
         try {
-            setLoading(true);
-            const token = localStorage.getItem('token');
-            if (!token) {
-                toast.error('Please login to access your profile');
-                return;
-            }
-
-            const response = await axios.get('/doctors/profile', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (response.data.doctor) {
-                setDoctorProfile(response.data.doctor);
-                // Set appointments from the profile
-                if (response.data.doctor.profile?.appointments) {
-                    setAppointments(response.data.doctor.profile.appointments);
-                }
-                if (response.data.doctor.profile.hospital) {
-                    setSelectedHospital(response.data.doctor.profile.hospital);
-                }
-            }
+            const response = await axios.get('/doctors/profile');
+            setDoctorProfile(response.data.doctor);
         } catch (error) {
             console.error('Error fetching doctor profile:', error);
-            toast.error(error.response?.data?.message || 'Failed to load doctor profile');
-            setError(error.response?.data?.message || 'Failed to load doctor profile');
-        } finally {
-            setLoading(false);
+            toast.error('Failed to fetch doctor profile');
         }
     };
 
-    const fetchAppointments = async () => {
+    const handleApproveAppointment = async (appointmentId) => {
         try {
-            setLoading(true);
-            const response = await axios.get(`https://mycarebridge.onrender.com/api/appointments/doctor/${user._id}`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-            setAppointments(response.data.appointments);
-        } catch (err) {
-            console.error("Error fetching appointments:", err);
-            setError(err.response?.data?.message || "Failed to fetch appointments");
-        } finally {
-            setLoading(false);
+            await axios.put(`/doctors/appointments/${appointmentId}/approve`);
+            toast.success('Appointment approved');
+            fetchDoctorProfile(); // Refresh profile to get updated appointments
+        } catch (error) {
+            console.error('Error approving appointment:', error);
+            toast.error('Failed to approve appointment');
         }
     };
 
-    const fetchHospitals = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                throw new Error('No authentication token found');
-            }
-
-            const response = await axios.get('/hospital', {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-            setHospitals(response.data.hospitals);
-        } catch (err) {
-            toast.error('Error fetching hospitals');
-            console.error('Error fetching hospitals:', err);
-        }
-    };
-
-    const handleHospitalSelect = async (hospitalId) => {
-        try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                throw new Error('No authentication token found');
-            }
-
-            const response = await axios.put(`/doctors/update-hospital/${user._id}`, 
-                { hospitalId },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                }
-            );
-
-            setSelectedHospital(response.data.hospital);
-            toast.success('Hospital updated successfully');
-            fetchDoctorProfile(); // Refresh profile to get updated hospital info
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Error updating hospital');
-            console.error('Error updating hospital:', err);
-        }
-    };
-
-    const handleAppointmentAction = async (appointmentId, action) => {
-        try {
-            const response = await axios.patch(
-                `https://mycarebridge.onrender.com/api/appointments/${appointmentId}`,
-                { status: action },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                }
-            );
-            
-            if (response.data.success) {
-                toast.success(`Appointment ${action} successfully`);
-                fetchAppointments();
-            }
-        } catch (err) {
-            console.error(`Error ${action}ing appointment:`, err);
-            toast.error(err.response?.data?.message || `Failed to ${action} appointment`);
-        }
-    };
-
-    const handleCreateProfile = async (e) => {
-        e.preventDefault();
-        try {
-            setLoading(true);
-            setError(null);
-            const response = await axios.post("https://mycarebridge.onrender.com/api/doctors/profile", formData, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-            if (response.data && response.data.doctor) {
-                setDoctorProfile(response.data.doctor);
-                setError(null);
-            }
-        } catch (err) {
-            console.error("Error creating profile:", err);
-            setError(err.response?.data?.message || "Error creating profile");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        if (name.startsWith('qualification_')) {
-            const [_, index, field] = name.split('_');
-            const newQualifications = [...formData.qualifications];
-            newQualifications[index][field] = value;
-            setFormData(prev => ({
-                ...prev,
-                qualifications: newQualifications
-            }));
-        } else {
-            setFormData(prev => ({
-                ...prev,
-                [name]: value
-            }));
-        }
-    };
-
-    const addQualification = () => {
-        setFormData(prev => ({
-            ...prev,
-            qualifications: [...prev.qualifications, { degree: "", institution: "", year: "" }]
-        }));
-    };
-
-    const removeQualification = (index) => {
-        setFormData(prev => ({
-            ...prev,
-            qualifications: prev.qualifications.filter((_, i) => i !== index)
-        }));
-    };
-
-    const handleLanguageChange = (e) => {
-        const languages = e.target.value.split(',').map(lang => lang.trim());
-        setFormData(prev => ({
-            ...prev,
-            languages
-        }));
-    };
-
-    const callNextPatient = () => {
-        if (!socket || !user) return;
-        socket.emit('callNextPatient', { doctorId: user._id });
-    };
-
-    const completeConsultation = (patientId) => {
-        if (!socket || !user) return;
-        socket.emit('completeConsultation', { 
-            doctorId: user._id,
-            patientId: patientId
-        });
-    };
-
-    if (loading) {
+    if (!user?.hospitalId) {
         return (
-            <div className="min-h-screen bg-gray-100 p-6">
-                <div className="max-w-7xl mx-auto">
-                    <div className="animate-pulse">
-                        <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-                        <div className="h-64 bg-gray-200 rounded mb-4"></div>
-                    </div>
+            <div className="container mx-auto px-4 py-8">
+                <div className="bg-white rounded-lg shadow-md p-6">
+                    <h2 className="text-xl font-semibold text-red-600">No Hospital Assigned</h2>
+                    <p className="mt-2">Please contact your administrator to assign you to a hospital.</p>
                 </div>
             </div>
         );
     }
 
-    if (error) {
-        return (
-            <div className="min-h-screen bg-gray-100 p-6">
-                <div className="max-w-7xl mx-auto">
-                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-                        {error}
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    // Filter today's appointments
+    const today = new Date();
+    const todayMonth = today.getMonth();
+    const todayDate = today.getDate();
+    
+    console.log('Today:', today);
+    console.log('All appointments:', doctorProfile?.profile?.appointments);
+    
+    const todaysAppointments = doctorProfile?.profile?.appointments?.filter(appointment => {
+        const appointmentDate = new Date(appointment.date);
+        console.log('Appointment date:', appointmentDate);
+        return appointmentDate.getMonth() === todayMonth && 
+               appointmentDate.getDate() === todayDate && 
+               !appointment.isAvailable;
+    }) || [];
+    
+    console.log('Filtered appointments:', todaysAppointments);
 
     return (
-        <div className="min-h-screen bg-gray-100 p-6">
-            <div className="max-w-7xl mx-auto">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Doctor Profile Section */}
-                    <div className="lg:col-span-2">
-                        <div className="bg-white rounded-lg shadow p-6">
-                            <h2 className="text-2xl font-bold mb-4">Doctor Profile</h2>
-                            {doctorProfile?.profile && (
-                                <div className="space-y-4">
-                                    <div>
-                                        <h3 className="font-semibold">Personal Information</h3>
-                                        <p>Name: {doctorProfile.user.firstName} {doctorProfile.user.lastName}</p>
-                                        <p>Email: {doctorProfile.user.email}</p>
-                                        <p>Specialization: {doctorProfile.profile.specialization}</p>
-                                        <p>Experience: {doctorProfile.profile.experience} years</p>
-                                        <p>Consultation Fee: ${doctorProfile.profile.consultationFee}</p>
-                                    </div>
-                                    
-                                    <div>
-                                        <h3 className="font-semibold">Qualifications</h3>
-                                        {doctorProfile.profile.qualifications.map((qual, index) => (
-                                            <div key={qual._id} className="ml-4">
-                                                <p>Degree: {qual.degree}</p>
-                                                <p>Institution: {qual.institution}</p>
-                                                <p>Year: {qual.year}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    <div>
-                                        <h3 className="font-semibold">Languages</h3>
-                                        <p>{doctorProfile.profile.languages.join(', ')}</p>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="font-semibold">Bio</h3>
-                                        <p>{doctorProfile.profile.bio}</p>
-                                    </div>
+        <div className="container mx-auto px-4 py-8">
+            <h1 className="text-3xl font-bold mb-8">Doctor Dashboard</h1>
+            
+            {/* Doctor Profile Section */}
+            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+                <h2 className="text-xl font-semibold mb-4">Doctor Profile</h2>
+                {doctorProfile?.profile && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 className="font-semibold mb-2">Personal Information</h3>
+                            <p className="text-gray-600">Name: {doctorProfile.user.firstName}</p>
+                            <p className="text-gray-600">Email: {doctorProfile.user.email}</p>
+                            <p className="text-gray-600">Specialization: {doctorProfile.profile.specialization}</p>
+                            <p className="text-gray-600">Experience: {doctorProfile.profile.experience} years</p>
+                            <p className="text-gray-600">Consultation Fee: ${doctorProfile.profile.consultationFee}</p>
+                        </div>
+                        <div>
+                            <h3 className="font-semibold mb-2">Qualifications</h3>
+                            {doctorProfile.profile.qualifications.map((qual, index) => (
+                                <div key={qual._id} className="mb-2">
+                                    <p className="text-gray-600">Degree: {qual.degree}</p>
+                                    <p className="text-gray-600">Institution: {qual.institution}</p>
+                                    <p className="text-gray-600">Year: {qual.year}</p>
                                 </div>
-                            )}
+                            ))}
                         </div>
                     </div>
+                )}
+            </div>
 
-                    {/* Hospital Selection Section */}
-                    <div className="lg:col-span-1">
-                        <div className="bg-white rounded-lg shadow p-6">
-                            <h2 className="text-2xl font-bold mb-4">Hospital Selection</h2>
-                            <div className="space-y-4">
-                                <select
-                                    className="w-full p-2 border rounded"
-                                    value={selectedHospital?._id || ''}
-                                    onChange={(e) => handleHospitalSelect(e.target.value)}
-                                >
-                                    <option value="">Select a hospital</option>
-                                    {hospitals.map((hospital) => (
-                                        <option key={hospital._id} value={hospital._id}>
-                                            {hospital.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                {selectedHospital && (
-                                    <div className="mt-4">
-                                        <h3 className="font-semibold">Selected Hospital</h3>
-                                        <p>Name: {selectedHospital.name}</p>
-                                        <p>Address: {selectedHospital.address}</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Queue Management Section */}
-                    {selectedHospital && (
-                        <div className="lg:col-span-3">
-                            <QueueSystem 
-                                doctorId={user?._id}
-                                hospitalId={selectedHospital._id}
-                                role="doctor"
-                            />
-                        </div>
-                    )}
-
-                    {/* Appointments Section */}
-                    <div className="lg:col-span-3">
-                        <div className="bg-white rounded-lg shadow p-6">
-                            <h2 className="text-2xl font-bold mb-4">Appointments</h2>
-                            {appointments.length > 0 ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {appointments.map((appointment) => (
-                                        <div key={appointment._id} className="border rounded p-4">
-                                            <p className="font-semibold">
-                                                {new Date(appointment.date).toLocaleDateString()}
-                                            </p>
-                                            <p>Time: {appointment.startTime} - {appointment.endTime}</p>
-                                            <p>Status: {appointment.isAvailable ? 'Available' : 'Booked'}</p>
-                                            {appointment.patient && (
-                                                <p>Patient: {appointment.patient.firstName}</p>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="text-gray-500">No appointments scheduled</p>
-                            )}
-                        </div>
+            {/* Queue Management */}
+            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-semibold">Queue Management</h2>
+                    <div className="text-sm text-gray-600">
+                        Hospital ID: {user.hospitalId}
                     </div>
                 </div>
+                <QueueSystem 
+                    doctorId={user._id}
+                    hospitalId={user.hospitalId}
+                    role="doctor"
+                />
+            </div>
+
+            {/* All Appointments Section */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-xl font-semibold mb-4">All Appointments</h2>
+                {doctorProfile?.profile?.appointments?.length > 0 ? (
+                    <div className="space-y-4">
+                        {doctorProfile.profile.appointments.map((appointment) => (
+                            <div key={appointment._id} className="border rounded-lg p-4">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h3 className="font-semibold">
+                                            {appointment.patient ? `${appointment.patient.firstName} ${appointment.patient.lastName}` : 'Patient Name Not Available'}
+                                        </h3>
+                                        <p className="text-gray-600">Date: {new Date(appointment.date).toLocaleDateString()}</p>
+                                        <p className="text-gray-600">Time: {appointment.startTime} - {appointment.endTime}</p>
+                                        <p className="text-gray-600">Status: {appointment.status || 'Scheduled'}</p>
+                                    </div>
+                                    {appointment.status === 'pending' && (
+                                        <button
+                                            onClick={() => handleApproveAppointment(appointment._id)}
+                                            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                                        >
+                                            Approve
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-gray-500">No appointments scheduled</p>
+                )}
             </div>
         </div>
     );
-}
+};
+
+export default DoctorDashboard;

@@ -45,91 +45,41 @@ export async function createHospital(req, res) {
     }
 }
 //patient-NP
-export async function getHospitals(req,res){
-    try{
-        const hospitals = await HospitalModel.find()
-            .populate({
-                path: 'doctors',
-                model: 'DoctorProfile',
-                populate: {
-                    path: 'user',
-                    select: 'firstName lastName email'
-                }
-            });
-
-        if(!hospitals){
-            return res.status(404).json({message:"No hospitals found"});
-        }
-
-        // Transform the hospitals data
-        const transformedHospitals = hospitals.map(hospital => {
-            const transformedDoctors = hospital.doctors.map(doctor => ({
-                _id: doctor._id,
-                name: `${doctor.user.firstName} ${doctor.user.lastName}`,
-                specialization: doctor.specialization,
-                experience: doctor.experience,
-                consultationFee: doctor.consultationFee,
-                languages: doctor.languages,
-                bio: doctor.bio,
-                availability: doctor.availability
-            }));
-
-            return {
-                ...hospital.toObject(),
-                doctors: transformedDoctors
-            };
-        });
-
+export const getHospitals = async (req, res) => {
+    try {
+        const hospitals = await HospitalModel.find({});
         res.status(200).json({
-            message: "Hospitals found",
-            hospitals: transformedHospitals
+            message: "Hospitals retrieved successfully",
+            hospitals
         });
-    }catch(err){
-        res.status(500).json({message:err.message});
+    } catch (error) {
+        console.error("Error getting hospitals:", error);
+        res.status(500).json({ message: "Error getting hospitals" });
     }
-}
+};
 //patient-Np
-export async function getHospital(req,res){
-    try{
-        const hospitalId = req.params.id;
-        const hospital = await HospitalModel.findById(hospitalId)
-            .populate({
-                path: 'doctors',
-                model: 'DoctorProfile',
-                populate: {
-                    path: 'user',
-                    select: 'firstName lastName email'
-                }
-            });
-
-        if(!hospital){
-            return res.status(404).json({message:"No hospital found"});
+export const getHospital = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Check if the request is for 'getall'
+        if (id === 'getall') {
+            return getHospitals(req, res);
         }
 
-        // Transform the doctors data
-        const transformedHospital = {
-            ...hospital.toObject(),
-            doctors: hospital.doctors.map(doctor => ({
-                _id: doctor._id,
-                name: `${doctor.user.firstName} ${doctor.user.lastName}`,
-                specialization: doctor.specialization,
-                experience: doctor.experience,
-                consultationFee: doctor.consultationFee,
-                languages: doctor.languages,
-                bio: doctor.bio,
-                availability: doctor.availability
-            }))
-        };
-
+        const hospital = await HospitalModel.findById(id);
+        if (!hospital) {
+            return res.status(404).json({ message: "Hospital not found" });
+        }
         res.status(200).json({
-            message: "Hospital found",
-            hospital: transformedHospital
+            message: "Hospital retrieved successfully",
+            hospital
         });
-       
-    }catch(err){
-        res.status(500).json({message:err.message});
+    } catch (error) {
+        console.error("Error getting hospital:", error);
+        res.status(500).json({ message: "Error getting hospital" });
     }
-}
+};
 //hospital-C
 export async function updateHospital(req,res){
      try{

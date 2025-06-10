@@ -25,6 +25,7 @@ const PatientDashBroad = () => {
     const [appointmentReason, setAppointmentReason] = useState("");
     const [showAppointmentForm, setShowAppointmentForm] = useState(false);
     const [user, setUser] = useState(null);
+    const [appointments, setAppointments] = useState([]);
 
     const fetchDoctorDetails = async (doctorId) => {
         try {
@@ -88,7 +89,9 @@ const PatientDashBroad = () => {
         // Get user from localStorage
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
-            setUser(JSON.parse(storedUser));
+            const parsedUser = JSON.parse(storedUser);
+            setUser(parsedUser);
+            fetchAppointments(parsedUser._id);
         } else {
             navigate('/login');
         }
@@ -121,14 +124,14 @@ const PatientDashBroad = () => {
             }
 
             console.log("Fetching nearby hospitals for:", { lat, lng });
-            const response = await axios.get(`https://mycarebridge.onrender.com/api/hospital/getnearBy/${lat}/${lng}`);
+            const response = await axios.get(`https://mycarebridge.onrender.com/api/hospital/nearby/${lat}/${lng}`);
             console.log("Nearby hospitals response:", response.data);
             
             if (response.data && response.data.hospitals && response.data.hospitals.length > 0) {
                 setHospitals(response.data.hospitals);
             } else {
                 console.log("No nearby hospitals found, fetching all hospitals");
-                const allHospitalsResponse = await axios.get("https://mycarebridge.onrender.com/api/hospital/getall");
+                const allHospitalsResponse = await axios.get("https://mycarebridge.onrender.com/api/hospital");
                 if (allHospitalsResponse.data && allHospitalsResponse.data.hospitals) {
                     setHospitals(allHospitalsResponse.data.hospitals);
                 } else {
@@ -139,7 +142,7 @@ const PatientDashBroad = () => {
             console.error("Error fetching nearby hospitals:", err);
             // Only fetch all hospitals if nearby hospitals API fails
             try {
-                const allHospitalsResponse = await axios.get("https://mycarebridge.onrender.com/api/hospital/getall");
+                const allHospitalsResponse = await axios.get("https://mycarebridge.onrender.com/api/hospital");
                 if (allHospitalsResponse.data && allHospitalsResponse.data.hospitals) {
                     setHospitals(allHospitalsResponse.data.hospitals);
                 } else {
@@ -156,7 +159,7 @@ const PatientDashBroad = () => {
 
     async function GetAllHospitals() {
         try {
-            const response = await axios.get("https://mycarebridge.onrender.com/api/hospital/getall");
+            const response = await axios.get("https://mycarebridge.onrender.com/api/hospital");
             if (response.data && response.data.hospitals) {
                 setAllHospitals(response.data.hospitals);
                 SetgetAll(!isgetAll);
@@ -213,6 +216,23 @@ const PatientDashBroad = () => {
             setError(err.response?.data?.message || "Failed to create appointment");
         }
     }
+
+    const fetchAppointments = async (userId) => {
+        try {
+            setLoading(true);
+            const response = await axios.get(`https://mycarebridge.onrender.com/api/appointments/patient/${userId}`);
+            if (response.data && response.data.appointments) {
+                setAppointments(response.data.appointments);
+            } else {
+                setAppointments([]);
+            }
+        } catch (err) {
+            console.error("Error fetching appointments:", err);
+            setError(err.response?.data?.message || "Failed to fetch appointments");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Combine both hospital lists for search
     const allHospitalsList = [...hospitals, ...allhospitals];
@@ -478,7 +498,39 @@ const PatientDashBroad = () => {
             ) : activeTab === 'appointments' ? (
                 <div className="bg-white rounded-lg shadow-lg p-6">
                     <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Appointments</h2>
-                    {/* Add your appointments list here */}
+                    {loading ? (
+                        <div className="text-center py-4">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+                            <p className="mt-2">Loading appointments...</p>
+                        </div>
+                    ) : error ? (
+                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+                            {error}
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {appointments && appointments.length > 0 ? (
+                                appointments.map((appointment) => (
+                                    <div key={appointment._id} className="border rounded-lg p-4 bg-gray-50">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h3 className="font-semibold text-lg">
+                                                    {appointment.doctor ? `${appointment.doctor.firstName} ${appointment.doctor.lastName}` : 'Doctor Name Not Available'}
+                                                </h3>
+                                                <p className="text-gray-600">Hospital: {appointment.hospital?.name || 'Not specified'}</p>
+                                                <p className="text-gray-600">Date: {new Date(appointment.appointmentDate).toLocaleDateString()}</p>
+                                                <p className="text-gray-600">Time: {appointment.appointmentTime}</p>
+                                                <p className="text-gray-600">Reason: {appointment.reason || 'Not specified'}</p>
+                                                <p className="text-gray-600">Status: <span className={`font-medium ${appointment.status === 'approved' ? 'text-green-600' : appointment.status === 'pending' ? 'text-yellow-600' : 'text-red-600'}`}>{appointment.status || 'pending'}</span></p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-gray-500 text-center py-4">No appointments scheduled</p>
+                            )}
+                        </div>
+                    )}
                 </div>
             ) : (
                 <div className="bg-white rounded-lg shadow-lg p-6">
