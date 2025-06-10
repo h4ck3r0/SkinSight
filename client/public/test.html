@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .log {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            height: 300px;
+            overflow-y: auto;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Socket Test</h1>
+    
+    <div class="controls">
+        <input type="text" id="doctorId" placeholder="Doctor ID">
+        <input type="text" id="hospitalId" placeholder="Hospital ID">
+        <button onclick="joinQueue()">Join Queue</button>
+        <button onclick="disconnect()">Disconnect</button>
+    </div>
+
+    <div class="log" id="log"></div>
+
+    <script>
+        const socket = io('https://mycarebridge.onrender.com', {
+            withCredentials: true
+        });
+
+        // Connection events
+        socket.on('connect', () => {
+            log('Connected to server. Socket ID: ' + socket.id);
+        });
+
+        socket.on('disconnect', () => {
+            log('Disconnected from server');
+        });
+
+        socket.on('connect_error', (error) => {
+            log('Connection error: ' + error);
+        });
+
+        // Queue events
+        socket.on('queueUpdate', (data) => {
+            log('Queue update received: ' + JSON.stringify(data));
+        });
+
+        socket.on('positionUpdate', (data) => {
+            log('Position update received: ' + JSON.stringify(data));
+        });
+
+        // Functions
+        function joinQueue() {
+            const doctorId = document.getElementById('doctorId').value;
+            const hospitalId = document.getElementById('hospitalId').value;
+            
+            if (!doctorId || !hospitalId) {
+                log('Please enter both Doctor ID and Hospital ID');
+                return;
+            }
+
+            socket.emit('joinQueue', { doctorId, hospitalId });
+            log('Joining queue for Doctor: ' + doctorId + ', Hospital: ' + hospitalId);
+        }
+
+        function disconnect() {
+            socket.disconnect();
+        }
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `<div>[${time}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+    </script>
+</body>
+</html> 
