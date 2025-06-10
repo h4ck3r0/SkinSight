@@ -90,14 +90,14 @@ export default function DoctorDashboard() {
     };
 
     const fetchAppointments = async () => {
-        if (!doctorProfile || !doctorProfile._id) {
+        if (!doctorProfile || !doctorProfile.profile || !doctorProfile.profile._id) {
             console.log("Waiting for doctor profile to load...");
             return;
         }
 
         try {
-            console.log("Fetching appointments for doctor:", doctorProfile._id);
-            const response = await axios.get(`https://mycarebridge.onrender.com/api/appointments/doctor/${doctorProfile._id}`, {
+            console.log("Fetching appointments for doctor:", doctorProfile.profile._id);
+            const response = await axios.get(`https://mycarebridge.onrender.com/api/appointments/doctor/${doctorProfile.profile._id}`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
@@ -114,6 +114,7 @@ export default function DoctorDashboard() {
 
     const handleAppointmentAction = async (appointmentId, action) => {
         try {
+            console.log("Updating appointment:", appointmentId, "with action:", action);
             const response = await axios.put(
                 `https://mycarebridge.onrender.com/api/appointments/update/${appointmentId}`,
                 { 
@@ -126,6 +127,7 @@ export default function DoctorDashboard() {
                     }
                 }
             );
+            console.log("Update response:", response.data);
             if (response.data) {
                 // Refresh appointments after action
                 fetchAppointments();

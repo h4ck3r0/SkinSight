@@ -349,8 +349,6 @@ export async function updateHospital(req, res) {
         if (!hospital) {
             return res.status(404).json({ message: "Hospital not found" });
         }
-
-        // Check if doctor profile exists, if not create one
         let doctorProfile = await DocterModel.findOne({ user: id });
         if (!doctorProfile) {
             console.log("Creating new doctor profile for user:", id);
