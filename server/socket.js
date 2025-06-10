@@ -21,124 +21,154 @@ export const SetupSocket = (server) => {
         allowEIO3: true
     });
 
-    // Store active queues
+    // Queue management
     const queues = new Map();
 
-    // Queue management functions
     const createQueue = (doctorId, hospitalId) => {
-        const queueKey = `${doctorId}:${hospitalId}`;
+        const queueKey = `${doctorId}-${hospitalId}`;
         if (!queues.has(queueKey)) {
             queues.set(queueKey, {
-                doctorId,
-                hospitalId,
                 patients: [],
-                status: 'active'
+                isActive: false,
+                currentPatient: null
             });
         }
         return queues.get(queueKey);
     };
 
-    const addToQueue = (doctorId, hospitalId, patient) => {
-        const queue = createQueue(doctorId, hospitalId);
-        queue.patients.push(patient);
-        return queue.patients.length;
+    const getQueue = (doctorId, hospitalId) => {
+        const queueKey = `${doctorId}-${hospitalId}`;
+        return queues.get(queueKey) || createQueue(doctorId, hospitalId);
+    };
+
+    const addToQueue = (doctorId, hospitalId, patientId) => {
+        const queue = getQueue(doctorId, hospitalId);
+        if (!queue.isActive) {
+            throw new Error('Queue is not active');
+        }
+        if (!queue.patients.includes(patientId)) {
+            queue.patients.push(patientId);
+            return queue.patients.length;
+        }
+        return null;
     };
 
     const removeFromQueue = (doctorId, hospitalId, patientId) => {
-        const queueKey = `${doctorId}:${hospitalId}`;
-        const queue = queues.get(queueKey);
-        if (queue) {
-            queue.patients = queue.patients.filter(p => p._id !== patientId);
-            if (queue.patients.length === 0) {
-                queues.delete(queueKey);
-            }
+        const queue = getQueue(doctorId, hospitalId);
+        const index = queue.patients.indexOf(patientId);
+        if (index !== -1) {
+            queue.patients.splice(index, 1);
+            return true;
         }
+        return false;
     };
 
     const getQueueStatus = (doctorId, hospitalId) => {
-        const queueKey = `${doctorId}:${hospitalId}`;
-        return queues.get(queueKey) || createQueue(doctorId, hospitalId);
+        return getQueue(doctorId, hospitalId);
+    };
+
+    const toggleQueueStatus = (doctorId, hospitalId, isActive) => {
+        const queue = getQueue(doctorId, hospitalId);
+        queue.isActive = isActive;
+        return queue;
     };
 
     io.on('connection', (socket) => {
         console.log('Client connected:', socket.id);
 
-        // Join a room (for private messages)
-        socket.on('joinRoom', (roomId) => {
-            socket.join(roomId);
-            console.log(`Socket ${socket.id} joined room ${roomId}`);
+        socket.on('joinRoom', (userId) => {
+            socket.join(userId);
+            console.log(`User ${userId} joined their room`);
         });
 
-        // Join queue
-        socket.on('joinQueue', ({ doctorId, hospitalId, patient }) => {
-            const position = addToQueue(doctorId, hospitalId, patient);
-            const queue = getQueueStatus(doctorId, hospitalId);
-            
-            // Notify all clients in the room about the queue update
-            io.to(`${doctorId}:${hospitalId}`).emit('queueUpdate', {
-                doctorId,
-                hospitalId,
-                queue
-            });
+        socket.on('joinQueue', async ({ doctorId, hospitalId, patientId }) => {
+            try {
+                const position = addToQueue(doctorId, hospitalId, patientId);
+                if (position !== null) {
+                    // Notify the patient of their position
+                    socket.to(patientId).emit('positionUpdate', {
+                        position,
+                        estimatedWaitTime: position * 15 // 15 minutes per patient
+                    });
 
-            // Notify the patient about their position
-            socket.emit('positionUpdate', {
-                position,
-                estimatedWaitTime: position * 15 // 15 minutes per patient
-            });
+                    // Notify everyone about the queue update
+                    io.to(doctorId).emit('queueUpdate', {
+                        doctorId,
+                        hospitalId,
+                        queue: getQueue(doctorId, hospitalId).patients,
+                        isActive: getQueue(doctorId, hospitalId).isActive
+                    });
+                }
+            } catch (error) {
+                socket.emit('error', error.message);
+            }
         });
 
-        // Leave queue
         socket.on('leaveQueue', ({ doctorId, hospitalId, patientId }) => {
-            removeFromQueue(doctorId, hospitalId, patientId);
-            const queue = getQueueStatus(doctorId, hospitalId);
-            
-            io.to(`${doctorId}:${hospitalId}`).emit('queueUpdate', {
-                doctorId,
-                hospitalId,
-                queue
-            });
-        });
-
-        // Call next patient
-        socket.on('callNextPatient', ({ doctorId, hospitalId }) => {
-            const queue = getQueueStatus(doctorId, hospitalId);
-            if (queue.patients.length > 0) {
-                const nextPatient = queue.patients[0];
-                removeFromQueue(doctorId, hospitalId, nextPatient._id);
-                
-                // Notify the patient
-                io.to(nextPatient._id).emit('patientCalled', {
+            if (removeFromQueue(doctorId, hospitalId, patientId)) {
+                // Notify everyone about the queue update
+                io.to(doctorId).emit('queueUpdate', {
                     doctorId,
                     hospitalId,
-                    patient: nextPatient
-                });
-
-                // Update queue for all clients
-                io.to(`${doctorId}:${hospitalId}`).emit('queueUpdate', {
-                    doctorId,
-                    hospitalId,
-                    queue: getQueueStatus(doctorId, hospitalId)
+                    queue: getQueue(doctorId, hospitalId).patients,
+                    isActive: getQueue(doctorId, hospitalId).isActive
                 });
             }
         });
 
-        // Complete consultation
+        socket.on('callNextPatient', ({ doctorId, hospitalId }) => {
+            const queue = getQueue(doctorId, hospitalId);
+            if (queue.patients.length > 0) {
+                const nextPatient = queue.patients.shift();
+                queue.currentPatient = nextPatient;
+
+                // Notify the patient
+                io.to(nextPatient).emit('patientCalled', {
+                    doctorId,
+                    hospitalId,
+                    patientId: nextPatient
+                });
+
+                // Notify everyone about the queue update
+                io.to(doctorId).emit('queueUpdate', {
+                    doctorId,
+                    hospitalId,
+                    queue: queue.patients,
+                    isActive: queue.isActive
+                });
+            }
+        });
+
         socket.on('completeConsultation', ({ doctorId, hospitalId, patientId }) => {
-            io.to(patientId).emit('consultationComplete', {
+            const queue = getQueue(doctorId, hospitalId);
+            if (queue.currentPatient === patientId) {
+                queue.currentPatient = null;
+                // Notify the patient
+                io.to(patientId).emit('consultationComplete', {
+                    doctorId,
+                    hospitalId,
+                    patientId
+                });
+            }
+        });
+
+        socket.on('getQueueStatus', ({ doctorId, hospitalId }) => {
+            const queue = getQueue(doctorId, hospitalId);
+            socket.emit('queueStatus', {
                 doctorId,
                 hospitalId,
-                patientId
+                queue: queue.patients,
+                isActive: queue.isActive
             });
         });
 
-        // Get queue status
-        socket.on('getQueueStatus', ({ doctorId, hospitalId }) => {
-            const queue = getQueueStatus(doctorId, hospitalId);
-            socket.emit('queueUpdate', {
+        socket.on('toggleQueueStatus', ({ doctorId, hospitalId, isActive }) => {
+            const queue = toggleQueueStatus(doctorId, hospitalId, isActive);
+            io.to(doctorId).emit('queueUpdate', {
                 doctorId,
                 hospitalId,
-                queue
+                queue: queue.patients,
+                isActive: queue.isActive
             });
         });
 

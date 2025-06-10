@@ -3,101 +3,332 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Socket Test</title>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <title>Queue System Test</title>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
         .log {
-            background: #f5f5f5;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-            height: 300px;
+            height: 200px;
             overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 10px;
+            background: #f5f5f5;
+            border-radius: 0.375rem;
         }
-        .controls {
-            margin: 20px 0;
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 0.375rem;
         }
-        button {
-            padding: 8px 16px;
-            margin: 5px;
-            cursor: pointer;
-        }
-        input {
-            padding: 8px;
-            margin: 5px;
-            width: 200px;
-        }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+        .info { background: #cce5ff; }
     </style>
 </head>
-<body>
-    <h1>Socket Test</h1>
-    
-    <div class="controls">
-        <input type="text" id="doctorId" placeholder="Doctor ID">
-        <input type="text" id="hospitalId" placeholder="Hospital ID">
-        <button onclick="joinQueue()">Join Queue</button>
-        <button onclick="disconnect()">Disconnect</button>
+<body class="bg-gray-100 min-h-screen p-6">
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6">Queue System Test</h1>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Connection Section -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-bold mb-4">Connection</h2>
+                <div class="space-y-4">
+                    <div>
+                        <input type="text" id="serverUrl" value="https://mycarebridge.onrender.com" 
+                               class="w-full px-3 py-2 border rounded" placeholder="Server URL">
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="connect()" 
+                                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                            Connect
+                        </button>
+                        <button onclick="disconnect()" 
+                                class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                            Disconnect
+                        </button>
+                    </div>
+                    <div id="connectionStatus" class="status">Not Connected</div>
+                </div>
+            </div>
+
+            <!-- Role Selection -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-bold mb-4">Role Selection</h2>
+                <div class="space-y-4">
+                    <select id="roleSelect" class="w-full px-3 py-2 border rounded" onchange="updateUI()">
+                        <option value="doctor">Doctor</option>
+                        <option value="staff">Staff</option>
+                        <option value="patient">Patient</option>
+                    </select>
+                    <div id="roleSpecificControls" class="space-y-4">
+                        <!-- Controls will be dynamically updated based on role -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Queue Management Section -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-bold mb-4">Queue Management</h2>
+                <div class="space-y-4">
+                    <div>
+                        <input type="text" id="doctorId" placeholder="Doctor ID" 
+                               class="w-full px-3 py-2 border rounded mb-2">
+                        <input type="text" id="hospitalId" placeholder="Hospital ID" 
+                               class="w-full px-3 py-2 border rounded mb-2">
+                        <input type="text" id="patientId" placeholder="Patient ID" 
+                               class="w-full px-3 py-2 border rounded">
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="joinQueue()" 
+                                class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                            Join Queue
+                        </button>
+                        <button onclick="leaveQueue()" 
+                                class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                            Leave Queue
+                        </button>
+                        <button onclick="getQueueStatus()" 
+                                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                            Get Status
+                        </button>
+                        <button onclick="callNextPatient()" 
+                                class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
+                            Call Next
+                        </button>
+                        <button onclick="toggleQueue()" 
+                                class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">
+                            Toggle Queue
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Queue Status Section -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-bold mb-4">Queue Status</h2>
+                <div id="queueStatus" class="log"></div>
+            </div>
+
+            <!-- Event Log Section -->
+            <div class="bg-white rounded-lg shadow p-6 md:col-span-2">
+                <h2 class="text-xl font-bold mb-4">Event Log</h2>
+                <div id="eventLog" class="log"></div>
+            </div>
+        </div>
     </div>
 
-    <div class="log" id="log"></div>
-
     <script>
-        const socket = io('https://mycarebridge.onrender.com', {
-            withCredentials: true
-        });
+        let socket;
+        let isConnected = false;
+        let currentRole = 'doctor';
 
-        // Connection events
-        socket.on('connect', () => {
-            log('Connected to server. Socket ID: ' + socket.id);
-        });
+        function log(message, type = 'info') {
+            const eventLog = document.getElementById('eventLog');
+            const entry = document.createElement('div');
+            entry.className = `status ${type}`;
+            entry.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+            eventLog.appendChild(entry);
+            eventLog.scrollTop = eventLog.scrollHeight;
+        }
 
-        socket.on('disconnect', () => {
-            log('Disconnected from server');
-        });
+        function updateQueueStatus(data) {
+            const queueStatus = document.getElementById('queueStatus');
+            queueStatus.innerHTML = `
+                <div class="space-y-2">
+                    <p class="font-semibold">Queue Status:</p>
+                    <p>Active: ${data.isActive ? 'Yes' : 'No'}</p>
+                    <p>Total Patients: ${data.queue.length}</p>
+                    <p class="font-semibold mt-4">Current Queue:</p>
+                    ${data.queue.map((patient, index) => `
+                        <div class="border p-2 rounded">
+                            <p>Position ${index + 1}: Patient ${patient}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
 
-        socket.on('connect_error', (error) => {
-            log('Connection error: ' + error);
-        });
-
-        // Queue events
-        socket.on('queueUpdate', (data) => {
-            log('Queue update received: ' + JSON.stringify(data));
-        });
-
-        socket.on('positionUpdate', (data) => {
-            log('Position update received: ' + JSON.stringify(data));
-        });
-
-        // Functions
-        function joinQueue() {
-            const doctorId = document.getElementById('doctorId').value;
-            const hospitalId = document.getElementById('hospitalId').value;
+        function updateUI() {
+            currentRole = document.getElementById('roleSelect').value;
+            const controls = document.getElementById('roleSpecificControls');
             
-            if (!doctorId || !hospitalId) {
-                log('Please enter both Doctor ID and Hospital ID');
-                return;
-            }
+            // Update visibility of controls based on role
+            document.getElementById('patientId').style.display = 
+                currentRole === 'patient' ? 'block' : 'none';
+            
+            // Update role-specific controls
+            controls.innerHTML = `
+                <p class="font-semibold">Current Role: ${currentRole}</p>
+                ${currentRole === 'doctor' || currentRole === 'staff' ? `
+                    <div class="flex gap-2">
+                        <button onclick="toggleQueue()" 
+                                class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">
+                            Toggle Queue
+                        </button>
+                        <button onclick="callNextPatient()" 
+                                class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
+                            Call Next Patient
+                        </button>
+                    </div>
+                ` : ''}
+            `;
+        }
 
-            socket.emit('joinQueue', { doctorId, hospitalId });
-            log('Joining queue for Doctor: ' + doctorId + ', Hospital: ' + hospitalId);
+        function connect() {
+            const serverUrl = document.getElementById('serverUrl').value;
+            socket = io(serverUrl, {
+                transports: ['websocket'],
+                reconnection: true,
+                reconnectionAttempts: 5
+            });
+
+            socket.on('connect', () => {
+                isConnected = true;
+                document.getElementById('connectionStatus').className = 'status success';
+                document.getElementById('connectionStatus').textContent = 'Connected';
+                log('Connected to server', 'success');
+            });
+
+            socket.on('disconnect', () => {
+                isConnected = false;
+                document.getElementById('connectionStatus').className = 'status error';
+                document.getElementById('connectionStatus').textContent = 'Disconnected';
+                log('Disconnected from server', 'error');
+            });
+
+            socket.on('connect_error', (error) => {
+                log(`Connection error: ${error.message}`, 'error');
+            });
+
+            // Queue-related event listeners
+            socket.on('queueUpdate', (data) => {
+                log('Queue updated', 'info');
+                updateQueueStatus(data);
+            });
+
+            socket.on('positionUpdate', (data) => {
+                log(`Position update: ${JSON.stringify(data)}`, 'info');
+            });
+
+            socket.on('patientCalled', (data) => {
+                log(`Patient called: ${JSON.stringify(data)}`, 'info');
+            });
+
+            socket.on('consultationComplete', (data) => {
+                log(`Consultation complete: ${JSON.stringify(data)}`, 'success');
+            });
+
+            socket.on('queueStatus', (data) => {
+                log('Queue status received', 'info');
+                updateQueueStatus(data);
+            });
+
+            socket.on('error', (error) => {
+                log(`Socket error: ${error}`, 'error');
+            });
         }
 
         function disconnect() {
-            socket.disconnect();
+            if (socket) {
+                socket.disconnect();
+            }
         }
 
-        function log(message) {
-            const logDiv = document.getElementById('log');
-            const time = new Date().toLocaleTimeString();
-            logDiv.innerHTML += `<div>[${time}] ${message}</div>`;
-            logDiv.scrollTop = logDiv.scrollHeight;
+        function joinQueue() {
+            if (!isConnected) {
+                log('Not connected to server', 'error');
+                return;
+            }
+            const doctorId = document.getElementById('doctorId').value;
+            const hospitalId = document.getElementById('hospitalId').value;
+            const patientId = document.getElementById('patientId').value;
+
+            if (!doctorId || !hospitalId || !patientId) {
+                log('Please fill in all fields', 'error');
+                return;
+            }
+
+            socket.emit('joinQueue', { doctorId, hospitalId, patientId });
+            log(`Joining queue for doctor ${doctorId} at hospital ${hospitalId}`, 'info');
         }
+
+        function leaveQueue() {
+            if (!isConnected) {
+                log('Not connected to server', 'error');
+                return;
+            }
+            const doctorId = document.getElementById('doctorId').value;
+            const hospitalId = document.getElementById('hospitalId').value;
+            const patientId = document.getElementById('patientId').value;
+
+            if (!doctorId || !hospitalId || !patientId) {
+                log('Please fill in all fields', 'error');
+                return;
+            }
+
+            socket.emit('leaveQueue', { doctorId, hospitalId, patientId });
+            log(`Leaving queue for doctor ${doctorId} at hospital ${hospitalId}`, 'info');
+        }
+
+        function getQueueStatus() {
+            if (!isConnected) {
+                log('Not connected to server', 'error');
+                return;
+            }
+            const doctorId = document.getElementById('doctorId').value;
+            const hospitalId = document.getElementById('hospitalId').value;
+
+            if (!doctorId || !hospitalId) {
+                log('Please fill in doctor and hospital IDs', 'error');
+                return;
+            }
+
+            socket.emit('getQueueStatus', { doctorId, hospitalId });
+            log(`Getting queue status for doctor ${doctorId} at hospital ${hospitalId}`, 'info');
+        }
+
+        function callNextPatient() {
+            if (!isConnected) {
+                log('Not connected to server', 'error');
+                return;
+            }
+            const doctorId = document.getElementById('doctorId').value;
+            const hospitalId = document.getElementById('hospitalId').value;
+
+            if (!doctorId || !hospitalId) {
+                log('Please fill in doctor and hospital IDs', 'error');
+                return;
+            }
+
+            socket.emit('callNextPatient', { doctorId, hospitalId });
+            log(`Calling next patient for doctor ${doctorId} at hospital ${hospitalId}`, 'info');
+        }
+
+        function toggleQueue() {
+            if (!isConnected) {
+                log('Not connected to server', 'error');
+                return;
+            }
+            const doctorId = document.getElementById('doctorId').value;
+            const hospitalId = document.getElementById('hospitalId').value;
+
+            if (!doctorId || !hospitalId) {
+                log('Please fill in doctor and hospital IDs', 'error');
+                return;
+            }
+
+            socket.emit('toggleQueueStatus', { 
+                doctorId, 
+                hospitalId, 
+                isActive: true // This will be toggled by the server
+            });
+            log(`Toggling queue status for doctor ${doctorId} at hospital ${hospitalId}`, 'info');
+        }
+
+        // Initialize UI
+        updateUI();
     </script>
 </body>
 </html> 

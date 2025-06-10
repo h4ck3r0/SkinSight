@@ -5,10 +5,9 @@ const useSocket = () => {
     const socketRef = useRef(null);
 
     useEffect(() => {
-        // Initialize socket connection with more resilient configuration
         socketRef.current = io(import.meta.env.VITE_SERVER_URL || 'https://mycarebridge.onrender.com', {
             withCredentials: true,
-            transports: ['websocket', 'polling'], // Allow fallback to polling
+            transports: ['websocket', 'polling'], 
             reconnection: true,
             reconnectionAttempts: 5,
             reconnectionDelay: 1000,

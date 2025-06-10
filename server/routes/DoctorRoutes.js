@@ -10,17 +10,21 @@ import {
     approveAppointment,
     getAllDoctors
 } from "../controllers/DoctorControllers.js"
+import { middleware } from '../middleware/middleware.js';
 
 const router = express.Router();
 
-router.post("/profile", createDoctorProfile);
-router.get("/profile", getDoctorProfile);
-router.put("/profile", updateDoctorProfile);
-router.delete("/profile", deleteDoctorProfile);
-router.put("/availability", updateAvailability);
-router.get("/availability/next", getNextAvailableSlot);
-router.get("/appointments", getDoctorAppointments);
-router.put("/appointments/:appointmentId/approve", approveAppointment);
+// Protected routes - require authentication
+router.post("/profile", middleware, createDoctorProfile);
+router.get("/profile", middleware, getDoctorProfile);
+router.put("/profile", middleware, updateDoctorProfile);
+router.delete("/profile", middleware, deleteDoctorProfile);
+router.put("/availability", middleware, updateAvailability);
+router.get("/availability/next", middleware, getNextAvailableSlot);
+router.get("/appointments", middleware, getDoctorAppointments);
+router.put("/appointments/:appointmentId/approve", middleware, approveAppointment);
+
+// Public route
 router.get("/getall", getAllDoctors);
 
 export default router;
