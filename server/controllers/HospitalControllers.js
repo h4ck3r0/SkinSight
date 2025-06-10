@@ -144,9 +144,23 @@ export const GetnearBy = async (req, res) => {
 
         console.log("Found hospitals:", hospitals.length);
 
+        // If no hospitals found within 10km, get all hospitals
+        if (hospitals.length === 0) {
+            console.log("No nearby hospitals found, returning all hospitals");
+            const allHospitals = await HospitalModel.find().populate({
+                path: 'doctors',
+                select: 'firstName lastName specialization experience consultationFee languages bio availability user._id'
+            });
+
+            return res.status(200).json({
+                success: true,
+                hospitals: allHospitals
+            });
+        }
+
         res.status(200).json({
             success: true,
-            hospitals: hospitals
+            hospitals: hospitals,
         });
     } catch (error) {
         console.error('Error finding nearby hospitals:', error);

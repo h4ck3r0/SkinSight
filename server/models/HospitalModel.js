@@ -67,5 +67,5 @@ HospitalSchema.pre('save', function(next) {
     next();
 });
 
-const HospitalModel = mongoose.model("HospitalProfile", HospitalSchema);
+const HospitalModel = mongoose.model("Hospital", HospitalSchema);
 export default HospitalModel;

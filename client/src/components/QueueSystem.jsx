@@ -6,7 +6,7 @@ import { toast } from "react-hot-toast";
 const QueueSystem = ({ doctorId, hospitalId, role }) => {
     const { socket } = useSocket();
     const { user } = useAuth();
-    const [queueStatus, setQueueStatus] = useState(null);
+    const [queueStatus, setQueueStatus] = useState([]);
     const [isQueueActive, setIsQueueActive] = useState(false);
     const [currentPosition, setCurrentPosition] = useState(null);
     const [estimatedWaitTime, setEstimatedWaitTime] = useState(null);
@@ -17,85 +17,130 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
     // Add event to log
     const addToLog = (message, type = 'info') => {
         const timestamp = new Date().toLocaleTimeString();
-        setEventLog(prev => [...prev, { message, type, timestamp }]);
+        setEventLog(prev => [...prev.slice(-9), { message, type, timestamp }]); // Keep only last 10 entries
     };
 
+    // Debug logging
     useEffect(() => {
-        if (!socket) return;
+        console.log('QueueSystem Props:', { doctorId, hospitalId, role });
+        console.log('User:', user);
+        addToLog(`QueueSystem initialized for ${role}`, 'info');
+    }, [doctorId, hospitalId, role, user]);
+
+    useEffect(() => {
+        if (!socket) {
+            addToLog('Socket not available', 'error');
+            return;
+        }
 
         // Socket connection status
-        socket.on('connect', () => {
+        const handleConnect = () => {
             setIsConnected(true);
             addToLog('Connected to server', 'success');
-        });
+            
+            // Join doctor's room if doctor role
+            if (role === 'doctor' && doctorId) {
+                socket.emit('joinRoom', doctorId);
+                addToLog(`Joined doctor room: ${doctorId}`, 'info');
+            }
+            
+            // Get initial queue status
+            if (doctorId && hospitalId) {
+                socket.emit('getQueueStatus', { doctorId, hospitalId });
+                addToLog('Requesting initial queue status', 'info');
+            }
+        };
 
-        socket.on('disconnect', () => {
+        const handleDisconnect = () => {
             setIsConnected(false);
             addToLog('Disconnected from server', 'error');
-        });
+        };
 
         // Socket event listeners
-        socket.on('queueUpdate', (data) => {
+        const handleQueueUpdate = (data) => {
+            console.log('Queue update received:', data);
             if (data.doctorId === doctorId && data.hospitalId === hospitalId) {
-                setQueueStatus(data.queue);
-                setIsQueueActive(data.isActive);
-                addToLog(`Queue updated: ${data.queue?.length || 0} patients in queue`, 'info');
+                setQueueStatus(data.queue || []);
+                setIsQueueActive(data.isActive || false);
+                addToLog(`Queue updated: ${data.queue?.length || 0} patients`, 'info');
             }
-        });
+        };
 
-        socket.on('positionUpdate', (data) => {
-            if (data.patientId === user._id) {
+        const handlePositionUpdate = (data) => {
+            console.log('Position update received:', data);
+            if (role === 'patient' && data.patientId === user._id) {
                 setCurrentPosition(data.position);
                 setEstimatedWaitTime(data.estimatedWaitTime);
                 addToLog(`Position updated: ${data.position}`, 'info');
             }
-        });
+        };
 
-        socket.on('patientCalled', (data) => {
-            if (data.patientId === user._id) {
+        const handlePatientCalled = (data) => {
+            console.log('Patient called:', data);
+            if (role === 'patient' && data.patientId === user._id) {
                 toast.success('You are being called by the doctor!');
                 setIsInQueue(false);
                 addToLog('You have been called!', 'success');
             }
-        });
+        };
 
-        socket.on('queueStatus', (data) => {
+        const handleQueueStatus = (data) => {
+            console.log('Queue status received:', data);
             if (data.doctorId === doctorId && data.hospitalId === hospitalId) {
-                setQueueStatus(data.queue);
-                setIsQueueActive(data.isActive);
+                setQueueStatus(data.queue || []);
+                setIsQueueActive(data.isActive || false);
                 addToLog(`Queue status: ${data.isActive ? 'Active' : 'Inactive'}`, 'info');
             }
-        });
+        };
 
-        socket.on('error', (error) => {
+        const handleError = (error) => {
+            console.error('Socket error:', error);
             addToLog(`Error: ${error}`, 'error');
             toast.error(error);
-        });
+        };
 
-        // Initial queue status check
-        if (doctorId && hospitalId) {
-            socket.emit('getQueueStatus', { doctorId, hospitalId });
+        // Check if already connected
+        if (socket.connected) {
+            handleConnect();
         }
 
+        // Add event listeners
+        socket.on('connect', handleConnect);
+        socket.on('disconnect', handleDisconnect);
+        socket.on('queueUpdate', handleQueueUpdate);
+        socket.on('positionUpdate', handlePositionUpdate);
+        socket.on('patientCalled', handlePatientCalled);
+        socket.on('queueStatus', handleQueueStatus);
+        socket.on('error', handleError);
+
         return () => {
-            socket.off('connect');
-            socket.off('disconnect');
-            socket.off('queueUpdate');
-            socket.off('positionUpdate');
-            socket.off('patientCalled');
-            socket.off('queueStatus');
-            socket.off('error');
+            socket.off('connect', handleConnect);
+            socket.off('disconnect', handleDisconnect);
+            socket.off('queueUpdate', handleQueueUpdate);
+            socket.off('positionUpdate', handlePositionUpdate);
+            socket.off('patientCalled', handlePatientCalled);
+            socket.off('queueStatus', handleQueueStatus);
+            socket.off('error', handleError);
         };
-    }, [socket, doctorId, hospitalId, user._id]);
+    }, [socket, doctorId, hospitalId, user._id, role]);
+
+    // Validation check
+    if (!doctorId || !hospitalId) {
+        return (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <h3 className="text-red-800 font-semibold">Queue System Error</h3>
+                <p className="text-red-700">Missing required parameters:</p>
+                <ul className="list-disc list-inside text-red-700 mt-2">
+                    {!doctorId && <li>Doctor ID is required</li>}
+                    {!hospitalId && <li>Hospital ID is required</li>}
+                </ul>
+            </div>
+        );
+    }
 
     const handleJoinQueue = () => {
         if (!isConnected) {
             toast.error('Not connected to server');
-            return;
-        }
-        
-        if (!doctorId || !hospitalId) {
-            toast.error('Missing doctor or hospital ID');
             return;
         }
         
@@ -111,11 +156,6 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
     const handleLeaveQueue = () => {
         if (!isConnected) {
             toast.error('Not connected to server');
-            return;
-        }
-        
-        if (!doctorId || !hospitalId) {
-            toast.error('Missing doctor or hospital ID');
             return;
         }
         
@@ -136,8 +176,8 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             return;
         }
         
-        if (!doctorId || !hospitalId) {
-            toast.error('Missing doctor or hospital ID');
+        if (!queueStatus || queueStatus.length === 0) {
+            toast.error('No patients in queue');
             return;
         }
         
@@ -151,17 +191,12 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             return;
         }
         
-        if (!doctorId || !hospitalId) {
-            toast.error('Missing doctor or hospital ID');
-            return;
-        }
-        
         socket.emit('completeConsultation', {
             doctorId,
             hospitalId,
             patientId
         });
-        addToLog('Consultation completed', 'success');
+        addToLog(`Completing consultation for patient: ${patientId}`, 'success');
     };
 
     const toggleQueueStatus = () => {
@@ -170,54 +205,55 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             return;
         }
         
-        if (!doctorId || !hospitalId) {
-            toast.error('Missing doctor or hospital ID');
-            return;
-        }
-        
+        const newStatus = !isQueueActive;
         socket.emit('toggleQueueStatus', {
             doctorId,
             hospitalId,
-            isActive: !isQueueActive
+            isActive: newStatus
         });
-        addToLog(`Toggling queue status...`, 'info');
+        addToLog(`${newStatus ? 'Starting' : 'Stopping'} queue...`, 'info');
     };
 
     return (
         <div className="space-y-6">
             {/* Connection Status */}
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                    <span className="text-sm font-medium">
-                        {isConnected ? 'Connected to server' : 'Disconnected'}
-                    </span>
+            <div className="bg-white rounded-lg border p-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                        <span className="text-sm font-medium">
+                            {isConnected ? 'Connected to server' : 'Disconnected'}
+                        </span>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                        Role: {role} | Doctor: {doctorId?.slice(-8)} | Hospital: {hospitalId?.slice(-8)}
+                    </div>
                 </div>
             </div>
 
             {/* Queue Status Display */}
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-lg border p-6">
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-2xl font-bold">Queue Management</h2>
+                    <h2 className="text-2xl font-bold">Queue Status</h2>
                     {(role === 'doctor' || role === 'staff') && (
                         <button
                             onClick={toggleQueueStatus}
                             disabled={!isConnected}
-                            className={`px-4 py-2 rounded ${
+                            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
                                 isQueueActive 
-                                    ? 'bg-red-500 hover:bg-red-600' 
-                                    : 'bg-green-500 hover:bg-green-600'
-                            } text-white transition-colors disabled:bg-gray-400`}
+                                    ? 'bg-red-500 hover:bg-red-600 text-white' 
+                                    : 'bg-green-500 hover:bg-green-600 text-white'
+                            } disabled:bg-gray-400 disabled:cursor-not-allowed`}
                         >
                             {isQueueActive ? 'Stop Queue' : 'Start Queue'}
                         </button>
                     )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-gray-50 p-4 rounded-lg text-center">
                         <p className="text-sm text-gray-600">Status</p>
-                        <p className="text-lg font-medium">
+                        <p className="text-lg font-bold">
                             {isQueueActive ? (
                                 <span className="text-green-600">Active</span>
                             ) : (
@@ -225,27 +261,27 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                             )}
                         </p>
                     </div>
-                    <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="bg-gray-50 p-4 rounded-lg text-center">
                         <p className="text-sm text-gray-600">Total Patients</p>
-                        <p className="text-lg font-medium">{queueStatus?.length || 0}</p>
+                        <p className="text-lg font-bold">{queueStatus?.length || 0}</p>
                     </div>
-                    {currentPosition && (
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                            <p className="text-sm text-gray-600">Your Position</p>
-                            <p className="text-lg font-medium">{currentPosition}</p>
+                    {role === 'patient' && currentPosition && (
+                        <div className="bg-blue-50 p-4 rounded-lg text-center">
+                            <p className="text-sm text-blue-600">Your Position</p>
+                            <p className="text-lg font-bold text-blue-800">{currentPosition}</p>
                         </div>
                     )}
-                    {estimatedWaitTime && (
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                            <p className="text-sm text-gray-600">Estimated Wait</p>
-                            <p className="text-lg font-medium">{estimatedWaitTime} minutes</p>
+                    {role === 'patient' && estimatedWaitTime && (
+                        <div className="bg-blue-50 p-4 rounded-lg text-center">
+                            <p className="text-sm text-blue-600">Estimated Wait</p>
+                            <p className="text-lg font-bold text-blue-800">{estimatedWaitTime} min</p>
                         </div>
                     )}
                 </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-lg border p-6">
                 <h3 className="text-lg font-semibold mb-4">Actions</h3>
                 <div className="flex flex-wrap gap-3">
                     {role === 'patient' && (
@@ -275,26 +311,34 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                             disabled={!isQueueActive || !queueStatus?.length || !isConnected}
                             className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:bg-gray-400 transition-colors"
                         >
-                            Call Next Patient
+                            Call Next Patient ({queueStatus?.length || 0} waiting)
                         </button>
                     )}
+                    <button
+                        onClick={() => socket?.emit('getQueueStatus', { doctorId, hospitalId })}
+                        disabled={!isConnected}
+                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 transition-colors"
+                    >
+                        Refresh Status
+                    </button>
                 </div>
             </div>
 
             {/* Queue List */}
             {queueStatus && queueStatus.length > 0 && (
-                <div className="bg-white rounded-lg shadow p-6">
-                    <h3 className="text-lg font-semibold mb-4">Current Queue</h3>
+                <div className="bg-white rounded-lg border p-6">
+                    <h3 className="text-lg font-semibold mb-4">Current Queue ({queueStatus.length} patients)</h3>
                     <div className="space-y-3">
-                        {queueStatus.map((patient, index) => (
-                            <div key={patient._id} className="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
+                        {queueStatus.map((patientId, index) => (
+                            <div key={patientId || index} className="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
                                 <div>
                                     <p className="font-medium">Position {index + 1}</p>
-                                    <p className="text-gray-600">Patient: {patient.firstName}</p>
+                                    <p className="text-gray-600">Patient ID: {patientId}</p>
+                                    <p className="text-xs text-gray-500">Est. wait: {(index) * 15} minutes</p>
                                 </div>
                                 {(role === 'doctor' || role === 'staff') && (
                                     <button
-                                        onClick={() => handleCompleteConsultation(patient._id)}
+                                        onClick={() => handleCompleteConsultation(patientId)}
                                         disabled={!isConnected}
                                         className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400 transition-colors"
                                     >
@@ -308,28 +352,32 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             )}
 
             {/* Event Log */}
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-lg border p-6">
                 <h3 className="text-lg font-semibold mb-4">Event Log</h3>
                 <div className="h-48 overflow-y-auto bg-gray-50 rounded-lg p-4">
-                    {eventLog.map((log, index) => (
-                        <div
-                            key={index}
-                            className={`mb-2 p-2 rounded ${
-                                log.type === 'error'
-                                    ? 'bg-red-100 text-red-700'
-                                    : log.type === 'success'
-                                    ? 'bg-green-100 text-green-700'
-                                    : 'bg-blue-100 text-blue-700'
-                            }`}
-                        >
-                            <span className="text-xs text-gray-500">{log.timestamp}</span>
-                            <p className="text-sm">{log.message}</p>
-                        </div>
-                    ))}
+                    {eventLog.length === 0 ? (
+                        <p className="text-gray-500 text-center">No events yet...</p>
+                    ) : (
+                        eventLog.map((log, index) => (
+                            <div
+                                key={index}
+                                className={`mb-2 p-2 rounded text-sm ${
+                                    log.type === 'error'
+                                        ? 'bg-red-100 text-red-700'
+                                        : log.type === 'success'
+                                        ? 'bg-green-100 text-green-700'
+                                        : 'bg-blue-100 text-blue-700'
+                                }`}
+                            >
+                                <span className="text-xs opacity-75">[{log.timestamp}]</span>
+                                <span className="ml-2">{log.message}</span>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
         </div>
     );
 };
 
-export default QueueSystem; 
+export default QueueSystem;

@@ -36,7 +36,7 @@ app.use(cors({
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/hospital', middleware, hospitalRoutes);
+app.use('/api/hospital', hospitalRoutes);
 app.use('/api/doctors', middleware, doctorRoutes);
 app.use('/api/appointments', middleware, appointmentRoutes);
 app.use('/api/queue', middleware, QueueRoutes);
