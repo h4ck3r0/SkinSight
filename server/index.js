@@ -4,11 +4,10 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { SetupSocket } from './socket.js';
-import authRoutes from './routes/auth.js';
-import doctorRoutes from './routes/doctors.js';
-import patientRoutes from './routes/patients.js';
-import hospitalRoutes from './routes/hospitals.js';
-import appointmentRoutes from './routes/appointments.js';
+import authRoutes from './routes/AuthRoutes.js';
+import doctorRoutes from './routes/DoctorRoutes.js';
+import hospitalRoutes from './routes/HospitalRoutes.js';
+import appointmentRoutes from './routes/AppointmentRoutes.js';
 import QueueRoutes from './routes/QueueRoutes.js';
 import { middleware } from './middleware/middleware.js';
 import cookieParser from 'cookie-parser';
@@ -37,11 +36,10 @@ app.use(cors({
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/doctors', doctorRoutes);
-app.use('/api/patients', patientRoutes);
-app.use('/api/hospitals', hospitalRoutes);
-app.use('/api/appointments', appointmentRoutes);
-app.use('/api/queue', QueueRoutes);
+app.use('/api/hospital', middleware, hospitalRoutes);
+app.use('/api/doctors', middleware, doctorRoutes);
+app.use('/api/appointments', middleware, appointmentRoutes);
+app.use('/api/queue', middleware, QueueRoutes);
 
 app.get("/", (req, res) => {
     res.send("I will show these mfs who i am ");
