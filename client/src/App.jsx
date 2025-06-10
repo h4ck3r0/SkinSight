@@ -9,6 +9,7 @@ import HospitalDashborad from "./components/HospitalDashborad";
 import HospitalSelection from "./components/HospitalSelection";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./ProtectedRoute";
+import SkinSightFeatures from "./components/features";
 import { SocketProvider } from './context/SocketContext';
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
+              <Route path='/features' element={<SkinSightFeatures/>}/>
               <Route
                 path="/patient"
                 element={
