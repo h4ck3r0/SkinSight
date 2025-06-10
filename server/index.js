@@ -25,7 +25,7 @@ import mongoose from "mongoose";
 
 const app=express();
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
 // CORS configuration
 const allowedOrigins = ['http://localhost:5173', 'https://mycarebridge.onrender.com'];
@@ -100,7 +100,13 @@ io.on("connection", (socket) => {
     });
 });
 
-mongoose.connect(process.env.MONGODB_URI)
+const mongoUrl = process.env.MONGO_URL;
+if (!mongoUrl) {
+    console.error("MONGO_URL is not defined in environment variables");
+    process.exit(1);
+}
+
+mongoose.connect(mongoUrl)
     .then(() => {
         console.log("Connected to MongoDB");
         server.listen(PORT,async ()=>{
@@ -120,12 +126,13 @@ mongoose.connect(process.env.MONGODB_URI)
 
 process.on('unhandledRejection', (err) => {
     console.error('Unhandled Promise Rejection:', err);
-    // Don't crash the server in production
     if (process.env.NODE_ENV === 'production') {
         console.error('Unhandled Promise Rejection:', err);
     } else {
         process.exit(1);
     }
 });
+
+export { io };
 
 
