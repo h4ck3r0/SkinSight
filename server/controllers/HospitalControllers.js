@@ -139,7 +139,7 @@ export const GetnearBy = async (req, res) => {
             }
         }).populate({
             path: 'doctors',
-            select: 'firstName lastName specialization experience consultationFee languages bio availability'
+            select: 'firstName lastName specialization experience consultationFee languages bio availability user._id'
         });
 
         console.log("Found hospitals:", hospitals.length);
