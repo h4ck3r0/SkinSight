@@ -374,3 +374,33 @@ export async function cleanupInvalidDoctors(req, res) {
         });
     }
 }
+export async function removeDoctor(req, res) {
+    try {
+        const { id, userId } = req.params;
+
+        const hospital = await HospitalModel.findById(id);
+        if (!hospital) {
+            return res.status(404).json({ 
+                success: false,
+                message: "Hospital not found" 
+            });
+        }
+
+        // Remove doctor from hospital's doctors array
+        hospital.doctors = hospital.doctors.filter(docId => docId.toString() !== userId);
+        await hospital.save();
+
+        res.status(200).json({ 
+            success: true,
+            message: "Doctor removed from hospital successfully",
+            data: hospital
+        });
+    } catch (error) {
+        console.error("Error removing doctor:", error);
+        res.status(500).json({ 
+            success: false,
+            message: "Error removing doctor from hospital",
+            error: error.message 
+        });
+    }
+}
