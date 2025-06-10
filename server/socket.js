@@ -5,12 +5,55 @@ import Queue from "./models/QueueModel.js";
 export const SetupSocket = (server) => {
     const io = new Server(server, {
         cors: {
-            origin: ["http://localhost:5173", "https://mycarebridge.onrender.com"],
-            methods: ["GET", "POST"],
-            credentials: true,
-            allowedHeaders: ["Content-Type", "Authorization"]
+            origin: process.env.CLIENT_URL || "http://localhost:5173",
+            credentials: true
         }
     });
+
+    // Store active queues
+    const activeQueues = new Map();
+
+    // Queue management functions
+    const createQueue = (doctorId, hospitalId) => {
+        const queueKey = `${doctorId}:${hospitalId}`;
+        if (!activeQueues.has(queueKey)) {
+            activeQueues.set(queueKey, {
+                patients: [],
+                currentNumber: 0,
+                status: 'active'
+            });
+        }
+        return activeQueues.get(queueKey);
+    };
+
+    const addToQueue = (doctorId, hospitalId, patientId) => {
+        const queue = createQueue(doctorId, hospitalId);
+        const position = queue.patients.length + 1;
+        queue.patients.push({
+            patientId,
+            position,
+            status: 'waiting',
+            joinedAt: new Date()
+        });
+        return position;
+    };
+
+    const removeFromQueue = (doctorId, hospitalId, patientId) => {
+        const queueKey = `${doctorId}:${hospitalId}`;
+        const queue = activeQueues.get(queueKey);
+        if (queue) {
+            queue.patients = queue.patients.filter(p => p.patientId !== patientId);
+            // Update positions
+            queue.patients.forEach((p, index) => {
+                p.position = index + 1;
+            });
+        }
+    };
+
+    const getQueueStatus = (doctorId, hospitalId) => {
+        const queueKey = `${doctorId}:${hospitalId}`;
+        return activeQueues.get(queueKey) || null;
+    };
 
     // Store io instance directly on server object
     server.io = io;
@@ -102,130 +145,92 @@ export const SetupSocket = (server) => {
             }
         });
 
+        // Join queue
         socket.on('joinQueue', (data) => {
-            const { doctorId, hospitalId } = data;
-            if (doctorId && hospitalId) {
-                const roomId = `queue:${doctorId}:${hospitalId}`;
-                socket.join(roomId);
-                console.log(`Client ${socket.id} joined queue room: ${roomId}`);
-            }
+            const { doctorId, hospitalId, patientId } = data;
+            const room = `queue:${doctorId}:${hospitalId}`;
+            
+            // Add to queue
+            const position = addToQueue(doctorId, hospitalId, patientId);
+            socket.join(room);
+
+            // Notify everyone in the room about the new position
+            io.to(room).emit('queueUpdate', {
+                queue: getQueueStatus(doctorId, hospitalId)
+            });
+
+            // Notify the specific patient about their position
+            socket.emit('positionUpdate', {
+                position,
+                estimatedWaitTime: position * 15 // 15 minutes per patient
+            });
+
+            console.log(`Patient ${patientId} joined queue at position ${position}`);
         });
 
+        // Leave queue
         socket.on('leaveQueue', (data) => {
+            const { doctorId, hospitalId, patientId } = data;
+            const room = `queue:${doctorId}:${hospitalId}`;
+            
+            removeFromQueue(doctorId, hospitalId, patientId);
+            socket.leave(room);
+
+            // Notify everyone in the room about the queue update
+            io.to(room).emit('queueUpdate', {
+                queue: getQueueStatus(doctorId, hospitalId)
+            });
+
+            console.log(`Patient ${patientId} left the queue`);
+        });
+
+        // Doctor calls next patient
+        socket.on('callNextPatient', (data) => {
             const { doctorId, hospitalId } = data;
-            if (doctorId && hospitalId) {
-                const roomId = `queue:${doctorId}:${hospitalId}`;
-                socket.leave(roomId);
-                console.log(`Client ${socket.id} left queue room: ${roomId}`);
+            const room = `queue:${doctorId}:${hospitalId}`;
+            const queue = getQueueStatus(doctorId, hospitalId);
+
+            if (queue && queue.patients.length > 0) {
+                const nextPatient = queue.patients[0];
+                nextPatient.status = 'in_consultation';
+                
+                // Notify the specific patient
+                io.to(room).emit('patientCalled', {
+                    patientId: nextPatient.patientId,
+                    position: nextPatient.position
+                });
+
+                // Update everyone about queue status
+                io.to(room).emit('queueUpdate', {
+                    queue: getQueueStatus(doctorId, hospitalId)
+                });
             }
         });
 
-        socket.on('queue:join', async (data) => {
-            try {
-                const { queueId, patientId } = data;
-                if (!queueId || !patientId) {
-                    socket.emit('queue:error', { message: 'Missing required fields' });
-                    return;
-                }
+        // Complete consultation
+        socket.on('completeConsultation', (data) => {
+            const { doctorId, hospitalId, patientId } = data;
+            const room = `queue:${doctorId}:${hospitalId}`;
+            
+            removeFromQueue(doctorId, hospitalId, patientId);
 
-                const queue = await Queue.findById(queueId).populate('patients.patientId');
-                if (!queue) {
-                    socket.emit('queue:error', { message: 'Queue not found' });
-                    return;
-                }
+            // Notify everyone about queue update
+            io.to(room).emit('queueUpdate', {
+                queue: getQueueStatus(doctorId, hospitalId)
+            });
 
-                if (queue.currentPatients >= queue.maxPatients) {
-                    socket.emit('queue:error', { message: 'Queue is full' });
-                    return;
-                }
-
-                const patientExists = queue.patients.some(p => p.patientId.toString() === patientId);
-                if (patientExists) {
-                    socket.emit('queue:error', { message: 'Patient already in queue' });
-                    return;
-                }
-
-                queue.patients.push({ patientId, status: 'waiting' });
-                queue.currentPatients += 1;
-                await queue.save();
-
-                socket.join(`queue:${queueId}`);
-                io.to(`queue:${queueId}`).emit('queue:updated', {
-                    queueId,
-                    patients: queue.patients,
-                    currentPatients: queue.currentPatients
-                });
-            } catch (error) {
-                socket.emit('queue:error', { message: error.message });
-            }
+            // Notify the patient
+            socket.emit('consultationComplete', {
+                patientId,
+                message: 'Consultation completed successfully'
+            });
         });
 
-        socket.on('queue:leave', async (data) => {
-            try {
-                const { queueId, patientId } = data;
-                if (!queueId || !patientId) {
-                    socket.emit('queue:error', { message: 'Missing required fields' });
-                    return;
-                }
-
-                const queue = await Queue.findById(queueId);
-                if (!queue) {
-                    socket.emit('queue:error', { message: 'Queue not found' });
-                    return;
-                }
-
-                const patientIndex = queue.patients.findIndex(p => p.patientId.toString() === patientId);
-                if (patientIndex === -1) {
-                    socket.emit('queue:error', { message: 'Patient not found in queue' });
-                    return;
-                }
-
-                queue.patients.splice(patientIndex, 1);
-                queue.currentPatients -= 1;
-                await queue.save();
-
-                socket.leave(`queue:${queueId}`);
-                io.to(`queue:${queueId}`).emit('queue:updated', {
-                    queueId,
-                    patients: queue.patients,
-                    currentPatients: queue.currentPatients
-                });
-            } catch (error) {
-                socket.emit('queue:error', { message: error.message });
-            }
-        });
-
-        socket.on('queue:update_status', async (data) => {
-            try {
-                const { queueId, patientId, status } = data;
-                if (!queueId || !patientId || !status) {
-                    socket.emit('queue:error', { message: 'Missing required fields' });
-                    return;
-                }
-
-                const queue = await Queue.findById(queueId);
-                if (!queue) {
-                    socket.emit('queue:error', { message: 'Queue not found' });
-                    return;
-                }
-
-                const patient = queue.patients.find(p => p.patientId.toString() === patientId);
-                if (!patient) {
-                    socket.emit('queue:error', { message: 'Patient not found in queue' });
-                    return;
-                }
-
-                patient.status = status;
-                await queue.save();
-
-                io.to(`queue:${queueId}`).emit('queue:updated', {
-                    queueId,
-                    patients: queue.patients,
-                    currentPatients: queue.currentPatients
-                });
-            } catch (error) {
-                socket.emit('queue:error', { message: error.message });
-            }
+        // Get queue status
+        socket.on('getQueueStatus', (data) => {
+            const { doctorId, hospitalId } = data;
+            const queue = getQueueStatus(doctorId, hospitalId);
+            socket.emit('queueStatus', { queue });
         });
 
         socket.on('disconnect', () => {
