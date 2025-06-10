@@ -1,164 +1,153 @@
-import { Server } from "socket.io";
+const { Server } = require('socket.io');
 import jwt from "jsonwebtoken";
 import Queue from "./models/QueueModel.js";
 
-export const SetupSocket = (server) => {
+const SetupSocket = (server) => {
     const io = new Server(server, {
         cors: {
-            origin: ["http://localhost:5173", "https://mycarebridge.onrender.com", "http://127.0.0.1:5500"],
-            methods: ["GET", "POST"],
+            origin: [
+                'http://localhost:5173',
+                'https://mycarebridge.onrender.com',
+                'http://127.0.0.1:5500'
+            ],
+            methods: ['GET', 'POST'],
             credentials: true,
-            allowedHeaders: ["Content-Type", "Authorization"]
-        }
+            allowedHeaders: ['Content-Type', 'Authorization']
+        },
+        transports: ['websocket', 'polling'],
+        pingTimeout: 60000,
+        pingInterval: 25000,
+        upgradeTimeout: 30000,
+        allowEIO3: true
     });
 
     // Store active queues
-    const activeQueues = new Map();
+    const queues = new Map();
 
     // Queue management functions
     const createQueue = (doctorId, hospitalId) => {
         const queueKey = `${doctorId}:${hospitalId}`;
-        if (!activeQueues.has(queueKey)) {
-            activeQueues.set(queueKey, {
+        if (!queues.has(queueKey)) {
+            queues.set(queueKey, {
+                doctorId,
+                hospitalId,
                 patients: [],
-                currentNumber: 0,
                 status: 'active'
             });
         }
-        return activeQueues.get(queueKey);
+        return queues.get(queueKey);
     };
 
-    const addToQueue = (doctorId, hospitalId, patientId) => {
+    const addToQueue = (doctorId, hospitalId, patient) => {
         const queue = createQueue(doctorId, hospitalId);
-        const position = queue.patients.length + 1;
-        queue.patients.push({
-            patientId,
-            position,
-            status: 'waiting',
-            joinedAt: new Date()
-        });
-        return position;
+        queue.patients.push(patient);
+        return queue.patients.length;
     };
 
     const removeFromQueue = (doctorId, hospitalId, patientId) => {
         const queueKey = `${doctorId}:${hospitalId}`;
-        const queue = activeQueues.get(queueKey);
+        const queue = queues.get(queueKey);
         if (queue) {
-            queue.patients = queue.patients.filter(p => p.patientId !== patientId);
-            // Update positions
-            queue.patients.forEach((p, index) => {
-                p.position = index + 1;
-            });
+            queue.patients = queue.patients.filter(p => p._id !== patientId);
+            if (queue.patients.length === 0) {
+                queues.delete(queueKey);
+            }
         }
     };
 
     const getQueueStatus = (doctorId, hospitalId) => {
         const queueKey = `${doctorId}:${hospitalId}`;
-        return activeQueues.get(queueKey) || null;
+        return queues.get(queueKey) || createQueue(doctorId, hospitalId);
     };
 
-    // Socket event handlers
     io.on('connection', (socket) => {
         console.log('Client connected:', socket.id);
 
-        // Join queue
-        socket.on('joinQueue', (data) => {
-            const { doctorId, hospitalId, patientId } = data;
-            const room = `queue:${doctorId}:${hospitalId}`;
-            
-            // Add to queue
-            const position = addToQueue(doctorId, hospitalId, patientId);
-            socket.join(room);
+        // Join a room (for private messages)
+        socket.on('joinRoom', (roomId) => {
+            socket.join(roomId);
+            console.log(`Socket ${socket.id} joined room ${roomId}`);
+        });
 
-            // Notify everyone in the room about the new position
-            io.to(room).emit('queueUpdate', {
-                queue: getQueueStatus(doctorId, hospitalId)
+        // Join queue
+        socket.on('joinQueue', ({ doctorId, hospitalId, patient }) => {
+            const position = addToQueue(doctorId, hospitalId, patient);
+            const queue = getQueueStatus(doctorId, hospitalId);
+            
+            // Notify all clients in the room about the queue update
+            io.to(`${doctorId}:${hospitalId}`).emit('queueUpdate', {
+                doctorId,
+                hospitalId,
+                queue
             });
 
-            // Notify the specific patient about their position
+            // Notify the patient about their position
             socket.emit('positionUpdate', {
                 position,
                 estimatedWaitTime: position * 15 // 15 minutes per patient
             });
-
-            console.log(`Patient ${patientId} joined queue at position ${position}`);
         });
 
         // Leave queue
-        socket.on('leaveQueue', (data) => {
-            const { doctorId, hospitalId, patientId } = data;
-            const room = `queue:${doctorId}:${hospitalId}`;
-            
+        socket.on('leaveQueue', ({ doctorId, hospitalId, patientId }) => {
             removeFromQueue(doctorId, hospitalId, patientId);
-            socket.leave(room);
-
-            // Notify everyone in the room about the queue update
-            io.to(room).emit('queueUpdate', {
-                queue: getQueueStatus(doctorId, hospitalId)
+            const queue = getQueueStatus(doctorId, hospitalId);
+            
+            io.to(`${doctorId}:${hospitalId}`).emit('queueUpdate', {
+                doctorId,
+                hospitalId,
+                queue
             });
-
-            console.log(`Patient ${patientId} left the queue`);
         });
 
-        // Doctor calls next patient
-        socket.on('callNextPatient', (data) => {
-            const { doctorId, hospitalId } = data;
-            const room = `queue:${doctorId}:${hospitalId}`;
+        // Call next patient
+        socket.on('callNextPatient', ({ doctorId, hospitalId }) => {
             const queue = getQueueStatus(doctorId, hospitalId);
-
-            if (queue && queue.patients.length > 0) {
+            if (queue.patients.length > 0) {
                 const nextPatient = queue.patients[0];
-                nextPatient.status = 'in_consultation';
+                removeFromQueue(doctorId, hospitalId, nextPatient._id);
                 
-                // Notify the specific patient
-                io.to(room).emit('patientCalled', {
-                    patientId: nextPatient.patientId,
-                    position: nextPatient.position
+                // Notify the patient
+                io.to(nextPatient._id).emit('patientCalled', {
+                    doctorId,
+                    hospitalId,
+                    patient: nextPatient
                 });
 
-                // Update everyone about queue status
-                io.to(room).emit('queueUpdate', {
+                // Update queue for all clients
+                io.to(`${doctorId}:${hospitalId}`).emit('queueUpdate', {
+                    doctorId,
+                    hospitalId,
                     queue: getQueueStatus(doctorId, hospitalId)
                 });
             }
         });
 
         // Complete consultation
-        socket.on('completeConsultation', (data) => {
-            const { doctorId, hospitalId, patientId } = data;
-            const room = `queue:${doctorId}:${hospitalId}`;
-            
-            removeFromQueue(doctorId, hospitalId, patientId);
-
-            // Notify everyone about queue update
-            io.to(room).emit('queueUpdate', {
-                queue: getQueueStatus(doctorId, hospitalId)
-            });
-
-            // Notify the patient
-            socket.emit('consultationComplete', {
-                patientId,
-                message: 'Consultation completed successfully'
+        socket.on('completeConsultation', ({ doctorId, hospitalId, patientId }) => {
+            io.to(patientId).emit('consultationComplete', {
+                doctorId,
+                hospitalId,
+                patientId
             });
         });
 
         // Get queue status
-        socket.on('getQueueStatus', (data) => {
-            const { doctorId, hospitalId } = data;
+        socket.on('getQueueStatus', ({ doctorId, hospitalId }) => {
             const queue = getQueueStatus(doctorId, hospitalId);
-            socket.emit('queueStatus', { queue });
+            socket.emit('queueUpdate', {
+                doctorId,
+                hospitalId,
+                queue
+            });
         });
 
-        // Disconnect handling
         socket.on('disconnect', () => {
             console.log('Client disconnected:', socket.id);
-        });
-
-        // Error handling
-        socket.on('error', (error) => {
-            console.error('Socket error:', error);
         });
     });
 
     return io;
 };
+
+module.exports = SetupSocket;
