@@ -191,11 +191,9 @@ export async function UpdateHospital(req, res) {
             });
         }
 
-        // Update user's hospitalId
         user.hospitalId = hospitalId;
         await user.save();
 
-        // Add doctor to hospital's doctors array if not already there
         if (!hospital.doctors.includes(doctorProfile._id)) {
             hospital.doctors.push(doctorProfile._id);
             await hospital.save();

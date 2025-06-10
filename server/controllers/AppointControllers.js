@@ -167,3 +167,30 @@ export async function approveAppointment(req, res) {
         });
     }
 }
+
+export async function getDoctorAppointments(req, res) {
+    try {
+        const { doctorId } = req.params;
+        console.log("Fetching appointments for doctor:", doctorId);
+        
+        const appointments = await Appointment.find({ doctor: doctorId })
+            .populate('patient', 'firstName lastName email')
+            .populate('hospital', 'name')
+            .sort({ appointmentDate: 1, appointmentTime: 1 });
+
+        if (!appointments) {
+            return res.status(404).json({ message: "No appointments found" });
+        }
+
+        res.status(200).json({ 
+            message: "Appointments retrieved successfully",
+            appointments 
+        });
+    } catch (err) {
+        console.error("GetDoctorAppointments error:", err);
+        res.status(500).json({
+            message: "Error retrieving appointments",
+            error: err.message
+        });
+    }
+}
