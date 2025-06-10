@@ -139,7 +139,7 @@ export const GetnearBy = async (req, res) => {
             }
         }).populate({
             path: 'doctors',
-            select: 'firstName lastName specialization experience consultationFee languages bio availability user._id'
+            select: 'firstName lastName specialization experience consultationFee languages bio availability user'
         });
 
         console.log("Found hospitals:", hospitals.length);
@@ -149,7 +149,7 @@ export const GetnearBy = async (req, res) => {
             console.log("No nearby hospitals found, returning all hospitals");
             const allHospitals = await HospitalModel.find().populate({
                 path: 'doctors',
-                select: 'firstName lastName specialization experience consultationFee languages bio availability user._id'
+                select: 'firstName lastName specialization experience consultationFee languages bio availability user'
             });
 
             return res.status(200).json({
