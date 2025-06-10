@@ -5,8 +5,10 @@ import Queue from "./models/QueueModel.js";
 export const SetupSocket = (server) => {
     const io = new Server(server, {
         cors: {
-            origin: process.env.CLIENT_URL || "http://localhost:5173",
-            credentials: true
+            origin: ["http://localhost:5173", "https://mycarebridge.onrender.com", "http://127.0.0.1:5500"],
+            methods: ["GET", "POST"],
+            credentials: true,
+            allowedHeaders: ["Content-Type", "Authorization"]
         }
     });
 
@@ -55,95 +57,9 @@ export const SetupSocket = (server) => {
         return activeQueues.get(queueKey) || null;
     };
 
-    // Store io instance directly on server object
-    server.io = io;
-
-    io.use((socket, next) => {
-        const token = socket.handshake.auth.token;
-        if (!token) {
-            return next(new Error("Invalid token"));
-        }
-        try {
-            const payload = jwt.verify(token, process.env.SECRET_KEY);
-            socket.user = payload;
-            next();
-        } catch (err) {
-            next(new Error("Invalidd token"));
-        }
-    });
-
-    io.on("connection", (socket) => {
-        console.log("Client connected:", socket.id);
-
-        socket.emit("Some mfs is connected ${socket.user.username}");
-        socket.join(socket.user._id.toString());
-
-        socket.on("joinHospital", (hospitalId) => {
-            if (hospitalId) {
-                socket.join(hospitalId.toString());
-                console.log("joined hospital ${hospitalId}");
-            }
-        });
-
-        socket.on("leaveHospital", (hospitalId) => {
-            if (hospitalId) {
-                socket.leave(hospitalId.toString());
-                console.log("left hospital ${hospitalId}");
-            }
-        });
-
-        socket.on("message:hospital", (data) => {
-            const { message, hospitalId } = data;
-            if (hospitalId) {
-                io.to(hospitalId.toString()).emit("message:hospital", {
-                    message,
-                    sender: socket.user,
-                    createdAt: new Date()
-                });
-            }
-        });
-
-        socket.on("message:private", (data) => {
-            const { message, receiverId } = data;
-            if (receiverId) {
-                socket.to(receiverId.toString()).emit("message:private", {
-                    message,
-                    sender: socket.user,
-                    createdAt: new Date()
-                });
-            }
-        });
-
-        socket.on("message:doctor", (data) => {
-            const { message, doctorId } = data;
-            if (doctorId) {
-                socket.to(doctorId.toString()).emit("message:doctor", {
-                    message,
-                    sender: socket.user,
-                    createdAt: new Date()
-                });
-            }
-        });
-
-        socket.on('appointment:request', (data) => {
-            const { doctorId, patientId } = data;
-            if (doctorId) {
-                io.to(`doctor:${doctorId}`).emit('appointment:request', data);
-            }
-            if (patientId) {
-                io.to(`patient:${patientId}`).emit('appointment:request', data);
-            }
-        });
-
-        socket.on('appointment:accept', (data) => {
-            const { doctorId, patientId } = data;
-            if (doctorId) {
-                io.to(`doctor:${doctorId}`).emit('appointment:accept', data);
-            }
-            if (patientId) {
-                io.to(`patient:${patientId}`).emit('appointment:accept', data);
-            }
-        });
+    // Socket event handlers
+    io.on('connection', (socket) => {
+        console.log('Client connected:', socket.id);
 
         // Join queue
         socket.on('joinQueue', (data) => {
@@ -233,10 +149,12 @@ export const SetupSocket = (server) => {
             socket.emit('queueStatus', { queue });
         });
 
+        // Disconnect handling
         socket.on('disconnect', () => {
             console.log('Client disconnected:', socket.id);
         });
 
+        // Error handling
         socket.on('error', (error) => {
             console.error('Socket error:', error);
         });
