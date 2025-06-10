@@ -1,268 +1,177 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import axios from "axios";
 import useSocket from "../hooks/useSocket";
 
-const socket = io("https://mycarebridge.onrender.com");
-
-export default function QueueSystem({ doctorId, hospitalId, userRole }) {
-    const [queue, setQueue] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [currentPatient, setCurrentPatient] = useState(null);
+const QueueSystem = ({ selectedDoctor, selectedHospital }) => {
     const [queueStatus, setQueueStatus] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const navigate = useNavigate();
     const socket = useSocket();
 
     useEffect(() => {
-        const fetchQueueStatus = async () => {
-            if (!doctorId || !hospitalId) return;
-
-            setLoading(true);
-            setError(null);
-            try {
-                const response = await axios.get(`${API_URL}/api/queue/status`, {
-                    params: {
-                        doctorId: doctorId,
-                        hospitalId: hospitalId
-                    }
-                });
-                setQueueStatus(response.data.data);
-            } catch (err) {
-                console.error("Error fetching queue status:", err);
-                setError(err.response?.data?.message || "Error fetching queue status");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchQueueStatus();
-
-        // Join queue room
-        if (socket && doctorId && hospitalId) {
+        if (socket && selectedDoctor && selectedHospital) {
+            // Join queue room
             socket.emit('joinQueue', {
-                doctorId: doctorId,
-                hospitalId: hospitalId
+                doctorId: selectedDoctor._id,
+                hospitalId: selectedHospital._id
             });
-        }
 
-        // Listen for queue updates
-        if (socket) {
+            // Listen for queue updates
             socket.on('queueUpdate', (data) => {
-                setQueueStatus(data.queue);
+                console.log('Queue update received:', data);
+                setQueueStatus(data);
             });
+
+            // Listen for position updates
+            socket.on('positionUpdate', (data) => {
+                console.log('Position update received:', data);
+                setQueueStatus(prev => ({
+                    ...prev,
+                    position: data.position
+                }));
+            });
+
+            return () => {
+                socket.off('queueUpdate');
+                socket.off('positionUpdate');
+            };
+        }
+    }, [socket, selectedDoctor, selectedHospital]);
+
+    const fetchQueueStatus = async () => {
+        if (!selectedDoctor || !selectedHospital) {
+            setError("Please select both a doctor and hospital");
+            return;
         }
 
-        return () => {
-            if (socket) {
-                socket.off('queueUpdate');
-                if (doctorId && hospitalId) {
-                    socket.emit('leaveQueue', {
-                        doctorId: doctorId,
-                        hospitalId: hospitalId
-                    });
-                }
-            }
-        };
-    }, [doctorId, hospitalId, socket]);
-
-    const startQueue = async () => {
+        setLoading(true);
+        setError(null);
         try {
-            const response = await axios.post(
-                "https://mycarebridge.onrender.com/api/queue/start",
-                { doctorId, hospitalId },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                }
-            );
-            setQueue(response.data.queue);
+            const response = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/queue/status`, {
+                params: {
+                    doctorId: selectedDoctor._id,
+                    hospitalId: selectedHospital._id
+                },
+                withCredentials: true
+            });
+            console.log("Queue status response:", response.data);
+            setQueueStatus(response.data.data);
         } catch (err) {
-            console.error("Error starting queue:", err);
-            setError(err.response?.data?.message || "Error starting queue");
+            console.error("Error fetching queue status:", err);
+            setError(err.response?.data?.message || "Failed to get queue status");
+        } finally {
+            setLoading(false);
         }
     };
 
     const joinQueue = async () => {
+        if (!selectedDoctor || !selectedHospital) {
+            setError("Please select both a doctor and hospital");
+            return;
+        }
+
+        setLoading(true);
+        setError(null);
         try {
             const response = await axios.post(
-                "https://mycarebridge.onrender.com/api/queue/join",
-                { doctorId, hospitalId, patientId: localStorage.getItem('userId') },
+                `${import.meta.env.VITE_SERVER_URL}/api/queue/join`,
                 {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                }
+                    doctorId: selectedDoctor._id,
+                    hospitalId: selectedHospital._id
+                },
+                { withCredentials: true }
             );
-            setQueue(response.data.queue);
+            console.log("Join queue response:", response.data);
+            setQueueStatus(response.data.data);
         } catch (err) {
             console.error("Error joining queue:", err);
-            setError(err.response?.data?.message || "Error joining queue");
+            setError(err.response?.data?.message || "Failed to join queue");
+        } finally {
+            setLoading(false);
         }
     };
 
-    const getNextPatient = async () => {
+    const leaveQueue = async () => {
+        if (!queueStatus) return;
+
+        setLoading(true);
+        setError(null);
         try {
             const response = await axios.post(
-                "https://mycarebridge.onrender.com/api/queue/next",
-                { doctorId, hospitalId },
+                `${import.meta.env.VITE_SERVER_URL}/api/queue/leave`,
                 {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                }
+                    queueId: queueStatus._id
+                },
+                { withCredentials: true }
             );
-            setQueue(response.data.queue);
-            setCurrentPatient(response.data.patient);
+            console.log("Leave queue response:", response.data);
+            setQueueStatus(null);
         } catch (err) {
-            console.error("Error getting next patient:", err);
-            setError(err.response?.data?.message || "Error getting next patient");
+            console.error("Error leaving queue:", err);
+            setError(err.response?.data?.message || "Failed to leave queue");
+        } finally {
+            setLoading(false);
         }
     };
 
-    const completeConsultation = async () => {
-        try {
-            const response = await axios.post(
-                "https://mycarebridge.onrender.com/api/queue/complete",
-                { doctorId, hospitalId, patientId: currentPatient.patient },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                }
-            );
-            setQueue(response.data.queue);
-            setCurrentPatient(null);
-        } catch (err) {
-            console.error("Error completing consultation:", err);
-            setError(err.response?.data?.message || "Error completing consultation");
-        }
-    };
-
-    const endQueue = async () => {
-        try {
-            const response = await axios.post(
-                "https://mycarebridge.onrender.com/api/queue/end",
-                { doctorId, hospitalId },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                }
-            );
-            setQueue(response.data.queue);
-        } catch (err) {
-            console.error("Error ending queue:", err);
-            setError(err.response?.data?.message || "Error ending queue");
-        }
-    };
-
-    if (loading) {
+    if (!selectedDoctor || !selectedHospital) {
         return (
-            <div className="flex items-center justify-center p-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-                {error}
+            <div className="text-center p-4">
+                <p className="text-gray-600">Please select a doctor and hospital first</p>
             </div>
         );
     }
 
     return (
-        <div className="bg-white shadow-lg rounded-lg p-6">
-            <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Queue System</h2>
-                {queue ? (
-                    <p className="text-sm text-gray-500">
-                        Current Queue Number: {queue.currentNumber}
-                    </p>
-                ) : (
-                    <p className="text-sm text-gray-500">No active queue</p>
-                )}
-            </div>
-
-            {/* Doctor/Staff Controls */}
-            {userRole === "doctor" && (
-                <div className="space-y-4">
-                    {!queue ? (
-                        <button
-                            onClick={startQueue}
-                            className="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                        >
-                            Start Queue
-                        </button>
-                    ) : (
-                        <>
-                            <button
-                                onClick={getNextPatient}
-                                disabled={currentPatient}
-                                className="w-full bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 disabled:opacity-50"
-                            >
-                                Get Next Patient
-                            </button>
-                            {currentPatient && (
-                                <button
-                                    onClick={completeConsultation}
-                                    className="w-full bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
-                                >
-                                    Complete Consultation
-                                </button>
-                            )}
-                            <button
-                                onClick={endQueue}
-                                className="w-full bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-                            >
-                                End Queue
-                            </button>
-                        </>
-                    )}
+        <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-2xl font-semibold mb-4">Queue Status</h2>
+            
+            {error && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                    {error}
                 </div>
             )}
 
-            {/* Patient Controls */}
-            {userRole === "patient" && queue && (
-                <div className="space-y-4">
+            {loading ? (
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+                    <p className="mt-2 text-gray-600">Loading...</p>
+                </div>
+            ) : queueStatus ? (
+                <div>
+                    <div className="mb-4">
+                        <p className="text-lg">
+                            Your position in queue: <span className="font-semibold">{queueStatus.position}</span>
+                        </p>
+                        <p className="text-sm text-gray-600">
+                            Estimated wait time: {queueStatus.estimatedWaitTime} minutes
+                        </p>
+                    </div>
+                    <button
+                        onClick={leaveQueue}
+                        className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors"
+                    >
+                        Leave Queue
+                    </button>
+                </div>
+            ) : (
+                <div>
+                    <p className="text-gray-600 mb-4">
+                        You are not currently in the queue. Join to get in line.
+                    </p>
                     <button
                         onClick={joinQueue}
-                        className="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
                     >
                         Join Queue
                     </button>
                 </div>
             )}
-
-            {/* Queue Status */}
-            {queue && (
-                <div className="mt-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Queue Status</h3>
-                    <div className="space-y-2">
-                        {queue.patients.map((patient) => (
-                            <div
-                                key={patient._id}
-                                className={`p-3 rounded ${
-                                    patient.status === "in_consultation"
-                                        ? "bg-yellow-100"
-                                        : patient.status === "completed"
-                                        ? "bg-green-100"
-                                        : "bg-gray-100"
-                                }`}
-                            >
-                                <p className="text-sm font-medium">
-                                    Queue #{patient.queueNumber} - {patient.patient.firstName} {patient.patient.lastName}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                    Status: {patient.status.replace("_", " ")}
-                                </p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
         </div>
     );
-} 
+};
+
+export default QueueSystem; 

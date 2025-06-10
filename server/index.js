@@ -22,34 +22,44 @@ import appointmentRoutes from './routes/AppointmentRoutes.js'
 import QueueRoutes from './routes/QueueRoutes.js'
 import { middleware } from './middleware/middleware.js';
 import mongoose from "mongoose";
+import cookieParser from "cookie-parser";
+import mongoSanitize from "express-mongo-sanitize";
+import xss from "xss-clean";
+import hpp from "hpp";
 
 const app=express();
 
 const PORT = process.env.PORT || 5000;
 
-// CORS configuration
-const allowedOrigins = ['http://localhost:5173', 'https://mycarebridge.onrender.com'];
-app.use(cors({
-    origin: function(origin, callback) {
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// Trust proxy - important for rate limiting behind a reverse proxy
+app.set('trust proxy', 1);
 
+// Security middleware
+app.use(helmet());
+app.use(mongoSanitize());
+app.use(xss());
+app.use(hpp());
+
+// Rate limiting
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, 
-    max: 100
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
 });
-app.use(limiter);
 
+app.use('/api/', limiter);
+
+// Middleware
 app.use(express.json());
-app.use(express.urlencoded({extended:true}));
+app.use(cookieParser());
+app.use(cors({
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+}));
 
 app.use('/api/auth',authRoutes);
 app.use('/api/hospital',middleware,hospitalRoutes)
@@ -64,36 +74,40 @@ app.get("/",(req,res)=>{
 app.get("/health", (req, res) => {
     res.status(200).json({ status: 'healthy' });
 });
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({
-        message: 'Something went wrong!',
-        error: process.env.NODE_ENV === 'production' ? {} : err
-    });
-});
 
-const server = http.createServer(app);
+// Create HTTP server
+const httpServer = http.createServer(app);
 
-// Initialize Socket.IO
-export const io = new Server(server, {
+// Simple Socket.IO setup
+const io = new Server(httpServer, {
     cors: {
-        origin: allowedOrigins,
-        methods: ['GET', 'POST'],
-        credentials: true,
-        allowedHeaders: ['Content-Type', 'Authorization']
+        origin: process.env.CLIENT_URL || "http://localhost:5173",
+        credentials: true
     }
 });
 
-// Store io instance in app.locals
-app.locals.io = io;
+// Basic socket connection handling
+io.on('connection', (socket) => {
+    console.log('Client connected:', socket.id);
 
-// Setup Socket.IO
-SetupSocket(server);
+    socket.on('joinQueue', (data) => {
+        const { doctorId, hospitalId } = data;
+        const room = `queue:${doctorId}:${hospitalId}`;
+        socket.join(room);
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Client disconnected:', socket.id);
+    });
+});
+
+// Make io accessible to routes
+app.set('io', io);
 
 mongoose.connect(process.env.MONGO_URL)
     .then(() => {
         console.log("Connected to MongoDB");
-        server.listen(PORT,async ()=>{
+        httpServer.listen(PORT,async ()=>{
             try{
                await ConnectDb();
                 console.log(`Server is running on port ${PORT}`);
