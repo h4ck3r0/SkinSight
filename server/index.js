@@ -20,6 +20,9 @@ import doctorRoutes from './routes/DoctorRoutes.js'
 import appointmentRoutes from './routes/AppointmentRoutes.js'
 import QueueRoutes from './routes/QueueRoutes.js'
 import { middleware } from './middleware/middleware.js';
+import { Server } from "socket.io";
+import mongoose from "mongoose";
+
 const app=express();
 
 const PORT = process.env.PORT || 3000;
@@ -70,18 +73,50 @@ app.use((err, req, res, next) => {
 });
 
 const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: process.env.CLIENT_URL || "http://localhost:5173",
+        methods: ["GET", "POST"]
+    }
+});
+
 SetupSocket(server);
 
-server.listen(PORT,async ()=>{
-    try{
-       await ConnectDb();
-        console.log(`Server is running on port ${PORT}`);
-        console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    }catch(err){
-        console.error("Server startup error:", err);
-        process.exit(1);
-    }
-})
+io.on("connection", (socket) => {
+    console.log("Client connected:", socket.id);
+
+    socket.on("join_queue_room", (doctorId) => {
+        socket.join(`queue:${doctorId}`);
+        console.log(`Client joined queue room for doctor: ${doctorId}`);
+    });
+
+    socket.on("leave_queue_room", (doctorId) => {
+        socket.leave(`queue:${doctorId}`);
+        console.log(`Client left queue room for doctor: ${doctorId}`);
+    });
+
+    socket.on("disconnect", () => {
+        console.log("Client disconnected:", socket.id);
+    });
+});
+
+mongoose.connect(process.env.MONGODB_URI)
+    .then(() => {
+        console.log("Connected to MongoDB");
+        server.listen(PORT,async ()=>{
+            try{
+               await ConnectDb();
+                console.log(`Server is running on port ${PORT}`);
+                console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+            }catch(err){
+                console.error("Server startup error:", err);
+                process.exit(1);
+            }
+        });
+    })
+    .catch((err) => {
+        console.error("MongoDB connection error:", err);
+    });
 
 process.on('unhandledRejection', (err) => {
     console.error('Unhandled Promise Rejection:', err);

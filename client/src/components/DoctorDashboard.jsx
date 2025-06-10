@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import QueueSystem from "./QueueSystem";
 
 export default function DoctorDashboard() {
     const navigate = useNavigate();
@@ -8,7 +9,7 @@ export default function DoctorDashboard() {
     const [doctorProfile, setDoctorProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [activeTab, setActiveTab] = useState('profile'); // 'profile' or 'appointments'
+    const [activeTab, setActiveTab] = useState('profile'); // 'profile' or 'appointments' or 'queue'
     const [appointments, setAppointments] = useState([]);
     const [formData, setFormData] = useState({
         specialization: "",
@@ -243,6 +244,16 @@ export default function DoctorDashboard() {
                         >
                             Appointments
                         </button>
+                        <button
+                            onClick={() => setActiveTab('queue')}
+                            className={`px-4 py-2 text-sm font-medium ${
+                                activeTab === 'queue'
+                                    ? 'border-b-2 border-blue-500 text-blue-600'
+                                    : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            Queue
+                        </button>
                     </div>
                 </div>
 
@@ -331,7 +342,7 @@ export default function DoctorDashboard() {
                             </div>
                         </div>
                     </div>
-                ) : (
+                ) : activeTab === 'appointments' ? (
                     <div className="bg-white shadow-lg rounded-lg overflow-hidden">
                         <div className="px-6 py-8">
                             <h2 className="text-2xl font-bold text-gray-900 mb-6">Appointments</h2>
@@ -402,6 +413,19 @@ export default function DoctorDashboard() {
                                     </div>
                                 )}
                             </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+                        <div className="px-6 py-8">
+                            <h2 className="text-2xl font-bold text-gray-900 mb-6">Queue Management</h2>
+                            {doctorProfile && (
+                                <QueueSystem
+                                    doctorId={doctorProfile.profile._id}
+                                    hospitalId={doctorProfile.profile.hospital}
+                                    userRole="doctor"
+                                />
+                            )}
                         </div>
                     </div>
                 )}

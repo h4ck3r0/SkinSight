@@ -1,55 +1,50 @@
 import mongoose from "mongoose";
 
-const QueueSchema = new mongoose.Schema({
-    hospitalId: {
+const queueSchema = new mongoose.Schema({
+    doctor: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'HospitalProfile',
+        ref: "User",
         required: true
     },
-    doctorId: {
+    hospital: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Doctor',
+        ref: "HospitalProfile",
         required: true
     },
-    queueNumber: {
-        type: Number,
-        required: true
-    },
-    status: {
-        type: String,
-        enum: ['active', 'closed'],
-        default: 'active'
-    },
-    maxPatients: {
-        type: Number,
-        required: true
-    },
-    currentPatients: {
+    currentNumber: {
         type: Number,
         default: 0
     },
+    isActive: {
+        type: Boolean,
+        default: false
+    },
     patients: [{
-        patientId: {
+        patient: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'User',
+            ref: "User",
+            required: true
+        },
+        queueNumber: {
+            type: Number,
             required: true
         },
         status: {
             type: String,
-            enum: ['waiting', 'in_progress', 'completed', 'cancelled'],
-            default: 'waiting'
+            enum: ["waiting", "in_consultation", "completed"],
+            default: "waiting"
         },
-        reason: String,
-        appointmentTime: {
+        joinedAt: {
             type: Date,
             default: Date.now
         }
-    }]
+    }],
+    createdAt: {
+        type: Date,
+        default: Date.now
+    }
 }, { timestamps: true });
 
-QueueSchema.index({ hospitalId: 1, doctorId: 1 });
-QueueSchema.index({ 'patients.patientId': 1 });
-
-const Queue = mongoose.model('Queue', QueueSchema);
+const Queue = mongoose.model("Queue", queueSchema);
 export default Queue;
 
