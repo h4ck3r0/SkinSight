@@ -12,7 +12,8 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
-import SetupSocket from './socket.js';
+import { Server } from 'socket.io';
+import { SetupSocket } from './socket.js';
 import authRoutes from './routes/AuthRoutes.js'
 import ConnectDb from './ConnectDb.js'
 import hospitalRoutes from './routes/HospitalRoutes.js'
@@ -20,7 +21,6 @@ import doctorRoutes from './routes/DoctorRoutes.js'
 import appointmentRoutes from './routes/AppointmentRoutes.js'
 import QueueRoutes from './routes/QueueRoutes.js'
 import { middleware } from './middleware/middleware.js';
-import { Server } from "socket.io";
 import mongoose from "mongoose";
 
 const app=express();
@@ -73,42 +73,24 @@ app.use((err, req, res, next) => {
 });
 
 const server = http.createServer(app);
-const io = new Server(server, {
+
+// Initialize Socket.IO
+export const io = new Server(server, {
     cors: {
-        origin: ["http://localhost:5173", "https://mycarebridge.onrender.com"],
-        methods: ["GET", "POST"],
+        origin: allowedOrigins,
+        methods: ['GET', 'POST'],
         credentials: true,
-        allowedHeaders: ["Content-Type", "Authorization"]
+        allowedHeaders: ['Content-Type', 'Authorization']
     }
 });
 
+// Store io instance in app.locals
+app.locals.io = io;
+
+// Setup Socket.IO
 SetupSocket(server);
 
-io.on("connection", (socket) => {
-    console.log("Client connected:", socket.id);
-
-    socket.on("join_queue_room", (doctorId) => {
-        socket.join(`queue:${doctorId}`);
-        console.log(`Client joined queue room for doctor: ${doctorId}`);
-    });
-
-    socket.on("leave_queue_room", (doctorId) => {
-        socket.leave(`queue:${doctorId}`);
-        console.log(`Client left queue room for doctor: ${doctorId}`);
-    });
-
-    socket.on("disconnect", () => {
-        console.log("Client disconnected:", socket.id);
-    });
-});
-
-const mongoUrl = process.env.MONGO_URL;
-if (!mongoUrl) {
-    console.error("MONGO_URL is not defined in environment variables");
-    process.exit(1);
-}
-
-mongoose.connect(mongoUrl)
+mongoose.connect(process.env.MONGO_URL)
     .then(() => {
         console.log("Connected to MongoDB");
         server.listen(PORT,async ()=>{
@@ -134,7 +116,5 @@ process.on('unhandledRejection', (err) => {
         process.exit(1);
     }
 });
-
-export { io };
 
 

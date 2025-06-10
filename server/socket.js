@@ -2,78 +2,87 @@ import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import Queue from "./models/QueueModel.js";
 
-async function SetupSocket(server){
-     const io=new Server(server);
+export const SetupSocket = (server) => {
+    const io = new Server(server, {
+        cors: {
+            origin: ["http://localhost:5173", "https://mycarebridge.onrender.com"],
+            methods: ["GET", "POST"],
+            credentials: true,
+            allowedHeaders: ["Content-Type", "Authorization"]
+        }
+    });
 
-     io.use((socket,next)=>{
-          const token=socket.handshake.auth.token;
-          if(!token){
-               return next(new Error("Invalid token"));
-          }
-          try{
-               const payload=jwt.verify(token,process.env.SECRET_KEY);
-               socket.user=payload;
-               next();
-          }catch(err){
-               next(new Error("Invalidd token"));
-          }
-          
-     })
+    // Store io instance directly on server object
+    server.io = io;
 
-     io.on("connection",(socket)=>{
-          console.log("connected");
+    io.use((socket, next) => {
+        const token = socket.handshake.auth.token;
+        if (!token) {
+            return next(new Error("Invalid token"));
+        }
+        try {
+            const payload = jwt.verify(token, process.env.SECRET_KEY);
+            socket.user = payload;
+            next();
+        } catch (err) {
+            next(new Error("Invalidd token"));
+        }
+    });
 
-          socket.emit("Some mfs is connected ${socket.user.username}")
-          socket.join(socket.user._id.toString());
+    io.on("connection", (socket) => {
+        console.log("Client connected:", socket.id);
 
-          socket.on("joinHospital",(hospitalId)=>{
-               if(hospitalId){
-                    socket.join(hospitalId.toString());
-                    console.log("joined hospital ${hospitalId}");
-               }
-          })
+        socket.emit("Some mfs is connected ${socket.user.username}");
+        socket.join(socket.user._id.toString());
 
-          socket.on("leaveHospital",(hospitalId)=>{
-               if(hospitalId){
-                    socket.leave(hospitalId.toString());
-                    console.log("left hospital ${hospitalId}");
-               }
-          })
+        socket.on("joinHospital", (hospitalId) => {
+            if (hospitalId) {
+                socket.join(hospitalId.toString());
+                console.log("joined hospital ${hospitalId}");
+            }
+        });
 
-          socket.on("message:hospital",(data)=>{
-               const {message,hospitalId}=data;
-               if(hospitalId){
-                    io.to(hospitalId.toString()).emit("message:hospital",{
-                         message,
-                         sender:socket.user,
-                         createdAt:new Date()
-                    })
-               }
-          })
+        socket.on("leaveHospital", (hospitalId) => {
+            if (hospitalId) {
+                socket.leave(hospitalId.toString());
+                console.log("left hospital ${hospitalId}");
+            }
+        });
 
-          socket.on("message:private",(data)=>{
-               const {message,receiverId}=data;
-               if(receiverId){
-                    socket.to(receiverId.toString()).emit("message:private",{
-                         message,
-                         sender:socket.user,
-                         createdAt:new Date()
-                    })
-               }
-          })
+        socket.on("message:hospital", (data) => {
+            const { message, hospitalId } = data;
+            if (hospitalId) {
+                io.to(hospitalId.toString()).emit("message:hospital", {
+                    message,
+                    sender: socket.user,
+                    createdAt: new Date()
+                });
+            }
+        });
 
-          socket.on("message:doctor",(data)=>{
-               const {message,doctorId}=data;
-               if(doctorId){
-                    socket.to(doctorId.toString()).emit("message:doctor",{
-                         message,
-                         sender:socket.user,
-                         createdAt:new Date()
-                    })
-               }
-          })
-          
-          socket.on('appointment:request', (data) => {
+        socket.on("message:private", (data) => {
+            const { message, receiverId } = data;
+            if (receiverId) {
+                socket.to(receiverId.toString()).emit("message:private", {
+                    message,
+                    sender: socket.user,
+                    createdAt: new Date()
+                });
+            }
+        });
+
+        socket.on("message:doctor", (data) => {
+            const { message, doctorId } = data;
+            if (doctorId) {
+                socket.to(doctorId.toString()).emit("message:doctor", {
+                    message,
+                    sender: socket.user,
+                    createdAt: new Date()
+                });
+            }
+        });
+
+        socket.on('appointment:request', (data) => {
             const { doctorId, patientId } = data;
             if (doctorId) {
                 io.to(`doctor:${doctorId}`).emit('appointment:request', data);
@@ -91,7 +100,25 @@ async function SetupSocket(server){
             if (patientId) {
                 io.to(`patient:${patientId}`).emit('appointment:accept', data);
             }
-        })
+        });
+
+        socket.on('joinQueue', (data) => {
+            const { doctorId, hospitalId } = data;
+            if (doctorId && hospitalId) {
+                const roomId = `queue:${doctorId}:${hospitalId}`;
+                socket.join(roomId);
+                console.log(`Client ${socket.id} joined queue room: ${roomId}`);
+            }
+        });
+
+        socket.on('leaveQueue', (data) => {
+            const { doctorId, hospitalId } = data;
+            if (doctorId && hospitalId) {
+                const roomId = `queue:${doctorId}:${hospitalId}`;
+                socket.leave(roomId);
+                console.log(`Client ${socket.id} left queue room: ${roomId}`);
+            }
+        });
 
         socket.on('queue:join', async (data) => {
             try {
@@ -201,11 +228,14 @@ async function SetupSocket(server){
             }
         });
 
-          socket.on("disconnect",()=>{
-               console.log("disconnected ${socket.user.username}");
-          })
+        socket.on('disconnect', () => {
+            console.log('Client disconnected:', socket.id);
+        });
 
-     })
-}
+        socket.on('error', (error) => {
+            console.error('Socket error:', error);
+        });
+    });
 
-export default SetupSocket;
+    return io;
+};

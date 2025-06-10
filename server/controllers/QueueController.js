@@ -1,5 +1,4 @@
 import Queue from "../models/QueueModel.js";
-import { io } from "../index.js";
 
 // Create a new queue
 export const createQueue = async (req, res) => {
@@ -29,13 +28,6 @@ export const createQueue = async (req, res) => {
 
         await queue.save();
 
-        // Notify all connected clients about the new queue
-        io.emit('queueCreated', {
-            queueId: queue._id,
-            doctorId,
-            hospitalId
-        });
-
         res.status(201).json({
             success: true,
             message: "Queue created successfully",
@@ -54,27 +46,35 @@ export const createQueue = async (req, res) => {
 // Get queue status
 export const getQueueStatus = async (req, res) => {
     try {
-        const { doctorId, hospitalId } = req.params;
+        const { doctorId, hospitalId } = req.query;
+        
+        // Validate required parameters
+        if (!doctorId || !hospitalId) {
+            return res.status(400).json({
+                success: false,
+                message: "Doctor ID and Hospital ID are required"
+            });
+        }
 
-        const queue = await Queue.findOne({
+        // Find the queue for the specified doctor and hospital
+        const queue = await Queue.findOne({ 
             doctor: doctorId,
-            hospital: hospitalId,
-            status: 'active'
+            hospital: hospitalId
         }).populate('patients.patient', 'firstName lastName');
 
         if (!queue) {
             return res.status(404).json({
                 success: false,
-                message: "No active queue found"
+                message: "Queue not found for this doctor and hospital"
             });
         }
 
-        res.status(200).json({
+        res.json({
             success: true,
-            queue
+            data: queue
         });
     } catch (error) {
-        console.error("Error getting queue status:", error);
+        console.error("Queue status error:", error);
         res.status(500).json({
             success: false,
             message: "Error getting queue status",
@@ -86,34 +86,40 @@ export const getQueueStatus = async (req, res) => {
 // Join queue
 export const joinQueue = async (req, res) => {
     try {
-        const { queueId } = req.params;
-        const { patientId } = req.body;
+        const { doctorId, hospitalId, patientId } = req.body;
 
-        const queue = await Queue.findById(queueId);
-
-        if (!queue) {
-            return res.status(404).json({
+        // Validate required parameters
+        if (!doctorId || !hospitalId || !patientId) {
+            return res.status(400).json({
                 success: false,
-                message: "Queue not found"
+                message: "Doctor ID, Hospital ID, and Patient ID are required"
             });
         }
 
-        if (queue.status !== 'active') {
-            return res.status(400).json({
-                success: false,
-                message: "Queue is not active"
+        // Find or create queue
+        let queue = await Queue.findOne({ 
+            doctor: doctorId,
+            hospital: hospitalId
+        });
+
+        if (!queue) {
+            queue = new Queue({
+                doctor: doctorId,
+                hospital: hospitalId,
+                patients: []
             });
         }
 
         // Check if patient is already in queue
-        const isInQueue = queue.patients.some(p => p.patient.toString() === patientId);
-        if (isInQueue) {
+        const existingPatient = queue.patients.find(p => p.patient.toString() === patientId);
+        if (existingPatient) {
             return res.status(400).json({
                 success: false,
                 message: "Patient is already in queue"
             });
         }
 
+        // Add patient to queue
         queue.patients.push({
             patient: patientId,
             joinedAt: new Date()
@@ -121,19 +127,21 @@ export const joinQueue = async (req, res) => {
 
         await queue.save();
 
-        // Notify all connected clients about the queue update
-        io.emit('queueUpdated', {
-            queueId: queue._id,
-            patients: queue.patients
-        });
+        // Emit queue update event to the specific queue room
+        const io = req.app.locals.io;
+        if (io) {
+            io.to(`queue:${doctorId}:${hospitalId}`).emit('queueUpdate', {
+                queue: queue
+            });
+        }
 
-        res.status(200).json({
+        res.json({
             success: true,
-            message: "Joined queue successfully",
-            queue
+            message: "Successfully joined queue",
+            data: queue
         });
     } catch (error) {
-        console.error("Error joining queue:", error);
+        console.error("Join queue error:", error);
         res.status(500).json({
             success: false,
             message: "Error joining queue",
@@ -145,10 +153,20 @@ export const joinQueue = async (req, res) => {
 // Leave queue
 export const leaveQueue = async (req, res) => {
     try {
-        const { queueId } = req.params;
-        const { patientId } = req.body;
+        const { doctorId, hospitalId, patientId } = req.body;
 
-        const queue = await Queue.findById(queueId);
+        // Validate required parameters
+        if (!doctorId || !hospitalId || !patientId) {
+            return res.status(400).json({
+                success: false,
+                message: "Doctor ID, Hospital ID, and Patient ID are required"
+            });
+        }
+
+        const queue = await Queue.findOne({ 
+            doctor: doctorId,
+            hospital: hospitalId
+        });
 
         if (!queue) {
             return res.status(404).json({
@@ -157,22 +175,25 @@ export const leaveQueue = async (req, res) => {
             });
         }
 
+        // Remove patient from queue
         queue.patients = queue.patients.filter(p => p.patient.toString() !== patientId);
         await queue.save();
 
-        // Notify all connected clients about the queue update
-        io.emit('queueUpdated', {
-            queueId: queue._id,
-            patients: queue.patients
-        });
+        // Emit queue update event to the specific queue room
+        const io = req.app.locals.io;
+        if (io) {
+            io.to(`queue:${doctorId}:${hospitalId}`).emit('queueUpdate', {
+                queue: queue
+            });
+        }
 
-        res.status(200).json({
+        res.json({
             success: true,
-            message: "Left queue successfully",
-            queue
+            message: "Successfully left queue",
+            data: queue
         });
     } catch (error) {
-        console.error("Error leaving queue:", error);
+        console.error("Leave queue error:", error);
         res.status(500).json({
             success: false,
             message: "Error leaving queue",
@@ -197,11 +218,6 @@ export const endQueue = async (req, res) => {
 
         queue.status = 'ended';
         await queue.save();
-
-        // Notify all connected clients about the queue ending
-        io.emit('queueEnded', {
-            queueId: queue._id
-        });
 
         res.status(200).json({
             success: true,
