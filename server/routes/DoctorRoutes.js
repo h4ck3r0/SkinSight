@@ -8,7 +8,8 @@ import {
     getNextAvailableSlot,
     deleteDoctorProfile,
     approveAppointment,
-    getAllDoctors
+    getAllDoctors,
+    updateDoctorHospital
 } from "../controllers/DoctorControllers.js"
 import { middleware } from '../middleware/middleware.js';
 
@@ -23,6 +24,7 @@ router.put("/availability", middleware, updateAvailability);
 router.get("/availability/next", middleware, getNextAvailableSlot);
 router.get("/appointments", middleware, getDoctorAppointments);
 router.put("/appointments/:appointmentId/approve", middleware, approveAppointment);
+router.put("/update-hospital/:id", middleware, updateDoctorHospital);
 
 // Public route
 router.get("/getall", getAllDoctors);

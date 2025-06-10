@@ -5,47 +5,168 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Queue System Test</title>
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: #f3f4f6;
+            min-height: 100vh;
+            padding: 1.5rem;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 80rem;
+            margin: 0 auto;
+        }
+
+        .title {
+            font-size: 1.875rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(1, 1fr);
+            gap: 1.5rem;
+        }
+
+        @media (min-width: 768px) {
+            .grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .input {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .button {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            color: white;
+            transition: background-color 0.2s;
+        }
+
+        .button-blue {
+            background-color: #3b82f6;
+        }
+
+        .button-blue:hover {
+            background-color: #2563eb;
+        }
+
+        .button-red {
+            background-color: #ef4444;
+        }
+
+        .button-red:hover {
+            background-color: #dc2626;
+        }
+
+        .button-green {
+            background-color: #22c55e;
+        }
+
+        .button-green:hover {
+            background-color: #16a34a;
+        }
+
+        .button-purple {
+            background-color: #a855f7;
+        }
+
+        .button-purple:hover {
+            background-color: #9333ea;
+        }
+
+        .button-yellow {
+            background-color: #eab308;
+        }
+
+        .button-yellow:hover {
+            background-color: #ca8a04;
+        }
+
+        .flex {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .space-y > * + * {
+            margin-top: 1rem;
+        }
+
         .log {
             height: 200px;
             overflow-y: auto;
-            border: 1px solid #ddd;
-            padding: 10px;
-            margin-top: 10px;
-            background: #f5f5f5;
+            border: 1px solid #e5e7eb;
+            padding: 0.625rem;
+            margin-top: 0.625rem;
+            background: #f9fafb;
             border-radius: 0.375rem;
         }
+
         .status {
-            margin-top: 10px;
-            padding: 10px;
+            margin-top: 0.625rem;
+            padding: 0.625rem;
             border-radius: 0.375rem;
         }
+
         .success { background: #d4edda; }
         .error { background: #f8d7da; }
         .info { background: #cce5ff; }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        @media (min-width: 768px) {
+            .full-width {
+                grid-column: span 2;
+            }
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen p-6">
-    <div class="max-w-7xl mx-auto">
-        <h1 class="text-3xl font-bold mb-6">Queue System Test</h1>
+<body>
+    <div class="container">
+        <h1 class="title">Queue System Test</h1>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid">
             <!-- Connection Section -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-xl font-bold mb-4">Connection</h2>
-                <div class="space-y-4">
+            <div class="card">
+                <h2 class="card-title">Connection</h2>
+                <div class="space-y">
                     <div>
                         <input type="text" id="serverUrl" value="https://mycarebridge.onrender.com" 
-                               class="w-full px-3 py-2 border rounded" placeholder="Server URL">
+                               class="input" placeholder="Server URL">
                     </div>
-                    <div class="flex gap-2">
-                        <button onclick="connect()" 
-                                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    <div class="flex">
+                        <button onclick="connect()" class="button button-blue">
                             Connect
                         </button>
-                        <button onclick="disconnect()" 
-                                class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                        <button onclick="disconnect()" class="button button-red">
                             Disconnect
                         </button>
                     </div>
@@ -54,51 +175,43 @@
             </div>
 
             <!-- Role Selection -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-xl font-bold mb-4">Role Selection</h2>
-                <div class="space-y-4">
-                    <select id="roleSelect" class="w-full px-3 py-2 border rounded" onchange="updateUI()">
+            <div class="card">
+                <h2 class="card-title">Role Selection</h2>
+                <div class="space-y">
+                    <select id="roleSelect" class="input" onchange="updateUI()">
                         <option value="doctor">Doctor</option>
                         <option value="staff">Staff</option>
                         <option value="patient">Patient</option>
                     </select>
-                    <div id="roleSpecificControls" class="space-y-4">
+                    <div id="roleSpecificControls" class="space-y">
                         <!-- Controls will be dynamically updated based on role -->
                     </div>
                 </div>
             </div>
 
             <!-- Queue Management Section -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-xl font-bold mb-4">Queue Management</h2>
-                <div class="space-y-4">
+            <div class="card">
+                <h2 class="card-title">Queue Management</h2>
+                <div class="space-y">
                     <div>
-                        <input type="text" id="doctorId" placeholder="Doctor ID" 
-                               class="w-full px-3 py-2 border rounded mb-2">
-                        <input type="text" id="hospitalId" placeholder="Hospital ID" 
-                               class="w-full px-3 py-2 border rounded mb-2">
-                        <input type="text" id="patientId" placeholder="Patient ID" 
-                               class="w-full px-3 py-2 border rounded">
+                        <input type="text" id="doctorId" placeholder="Doctor ID" class="input">
+                        <input type="text" id="hospitalId" placeholder="Hospital ID" class="input">
+                        <input type="text" id="patientId" placeholder="Patient ID" class="input">
                     </div>
-                    <div class="flex flex-wrap gap-2">
-                        <button onclick="joinQueue()" 
-                                class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                    <div class="flex">
+                        <button onclick="joinQueue()" class="button button-green">
                             Join Queue
                         </button>
-                        <button onclick="leaveQueue()" 
-                                class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                        <button onclick="leaveQueue()" class="button button-red">
                             Leave Queue
                         </button>
-                        <button onclick="getQueueStatus()" 
-                                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        <button onclick="getQueueStatus()" class="button button-blue">
                             Get Status
                         </button>
-                        <button onclick="callNextPatient()" 
-                                class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
+                        <button onclick="callNextPatient()" class="button button-purple">
                             Call Next
                         </button>
-                        <button onclick="toggleQueue()" 
-                                class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">
+                        <button onclick="toggleQueue()" class="button button-yellow">
                             Toggle Queue
                         </button>
                     </div>
@@ -106,14 +219,14 @@
             </div>
 
             <!-- Queue Status Section -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-xl font-bold mb-4">Queue Status</h2>
+            <div class="card">
+                <h2 class="card-title">Queue Status</h2>
                 <div id="queueStatus" class="log"></div>
             </div>
 
             <!-- Event Log Section -->
-            <div class="bg-white rounded-lg shadow p-6 md:col-span-2">
-                <h2 class="text-xl font-bold mb-4">Event Log</h2>
+            <div class="card full-width">
+                <h2 class="card-title">Event Log</h2>
                 <div id="eventLog" class="log"></div>
             </div>
         </div>

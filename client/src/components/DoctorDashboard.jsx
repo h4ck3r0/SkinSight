@@ -48,6 +48,8 @@ export default function DoctorDashboard() {
             coordinates: [0, 0]
         }
     });
+    const [hospitals, setHospitals] = useState([]);
+    const [selectedHospital, setSelectedHospital] = useState(null);
 
     useEffect(() => {
         if (!user) {
@@ -61,13 +63,9 @@ export default function DoctorDashboard() {
         }
 
         fetchAppointments();
+        fetchDoctorProfile();
+        fetchHospitals();
     }, [user, navigate]);
-
-    useEffect(() => {
-        if (user) {
-            fetchDoctorProfile();
-        }
-    }, [user]);
 
     useEffect(() => {
         if (!socket || !user) return;
@@ -124,6 +122,9 @@ export default function DoctorDashboard() {
                 if (response.data.doctor.profile?.appointments) {
                     setAppointments(response.data.doctor.profile.appointments);
                 }
+                if (response.data.doctor.profile.hospital) {
+                    setSelectedHospital(response.data.doctor.profile.hospital);
+                }
             }
         } catch (error) {
             console.error('Error fetching doctor profile:', error);
@@ -148,6 +149,50 @@ export default function DoctorDashboard() {
             setError(err.response?.data?.message || "Failed to fetch appointments");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchHospitals = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                throw new Error('No authentication token found');
+            }
+
+            const response = await axios.get('/hospital', {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+            setHospitals(response.data.hospitals);
+        } catch (err) {
+            toast.error('Error fetching hospitals');
+            console.error('Error fetching hospitals:', err);
+        }
+    };
+
+    const handleHospitalSelect = async (hospitalId) => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                throw new Error('No authentication token found');
+            }
+
+            const response = await axios.put(`/doctors/update-hospital/${user._id}`, 
+                { hospitalId },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }
+            );
+
+            setSelectedHospital(response.data.hospital);
+            toast.success('Hospital updated successfully');
+            fetchDoctorProfile(); // Refresh profile to get updated hospital info
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Error updating hospital');
+            console.error('Error updating hospital:', err);
         }
     };
 
@@ -285,7 +330,7 @@ export default function DoctorDashboard() {
                                 <div className="space-y-4">
                                     <div>
                                         <h3 className="font-semibold">Personal Information</h3>
-                                        <p>Name: {doctorProfile.user.firstName}</p>
+                                        <p>Name: {doctorProfile.user.firstName} {doctorProfile.user.lastName}</p>
                                         <p>Email: {doctorProfile.user.email}</p>
                                         <p>Specialization: {doctorProfile.profile.specialization}</p>
                                         <p>Experience: {doctorProfile.profile.experience} years</p>
@@ -317,14 +362,44 @@ export default function DoctorDashboard() {
                         </div>
                     </div>
 
-                    {/* Queue Management Section */}
+                    {/* Hospital Selection Section */}
                     <div className="lg:col-span-1">
-                        <QueueSystem 
-                            doctorId={user?._id}
-                            hospitalId={doctorProfile?.profile?.hospital}
-                            role="doctor"
-                        />
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <h2 className="text-2xl font-bold mb-4">Hospital Selection</h2>
+                            <div className="space-y-4">
+                                <select
+                                    className="w-full p-2 border rounded"
+                                    value={selectedHospital?._id || ''}
+                                    onChange={(e) => handleHospitalSelect(e.target.value)}
+                                >
+                                    <option value="">Select a hospital</option>
+                                    {hospitals.map((hospital) => (
+                                        <option key={hospital._id} value={hospital._id}>
+                                            {hospital.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                {selectedHospital && (
+                                    <div className="mt-4">
+                                        <h3 className="font-semibold">Selected Hospital</h3>
+                                        <p>Name: {selectedHospital.name}</p>
+                                        <p>Address: {selectedHospital.address}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
+
+                    {/* Queue Management Section */}
+                    {selectedHospital && (
+                        <div className="lg:col-span-3">
+                            <QueueSystem 
+                                doctorId={user?._id}
+                                hospitalId={selectedHospital._id}
+                                role="doctor"
+                            />
+                        </div>
+                    )}
 
                     {/* Appointments Section */}
                     <div className="lg:col-span-3">

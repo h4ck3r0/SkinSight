@@ -413,3 +413,33 @@ export async function updateHospital(req, res) {
         });
     }
 }
+
+export const updateDoctorHospital = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { hospitalId } = req.body;
+
+        if (!hospitalId) {
+            return res.status(400).json({ message: "Hospital ID is required" });
+        }
+
+        // Update the doctor's hospital
+        const updatedDoctor = await DocterModel.findByIdAndUpdate(
+            id,
+            { hospital: hospitalId },
+            { new: true }
+        ).populate('hospital');
+
+        if (!updatedDoctor) {
+            return res.status(404).json({ message: "Doctor not found" });
+        }
+
+        res.status(200).json({
+            message: "Hospital updated successfully",
+            doctor: updatedDoctor
+        });
+    } catch (error) {
+        console.error("Error updating doctor's hospital:", error);
+        res.status(500).json({ message: "Error updating doctor's hospital" });
+    }
+};
