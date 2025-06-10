@@ -347,8 +347,8 @@ const PatientDashBroad = () => {
                                         <h4 className="font-semibold mb-2">Available Doctors:</h4>
                                         {hospital.doctors && hospital.doctors.length > 0 ? (
                                             <ul className="space-y-3">
-                                                {hospital.doctors.map((doctor) => (
-                                                    <li key={doctor._id} className="bg-gray-50 p-3 rounded">
+                                                {hospital.doctors.map((doctor, index) => (
+                                                    <li key={doctor._id || index} className="bg-gray-50 p-3 rounded">
                                                         <div className="font-medium">{doctor.name}</div>
                                                         <div className="text-sm text-gray-600">
                                                             <span className="font-medium">Specialization:</span> {doctor.specialization}

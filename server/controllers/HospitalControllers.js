@@ -109,86 +109,74 @@ export async function deleteHospital(req,res){
     }
 }
 //patient-C
-export async function GetnearBy(req, res) {
+export const GetnearBy = async (req, res) => {
     try {
-        const { latitude, longitude, radius = 10 } = req.query;
-        console.log("Received coordinates:", { latitude, longitude });
+        const { lat, lng } = req.params;
         
-        // Convert coordinates to numbers and validate
-        const lat = parseFloat(latitude);
-        const lng = parseFloat(longitude);
+        // Validate coordinates
+        const latitude = parseFloat(lat);
+        const longitude = parseFloat(lng);
         
-        console.log("Converted coordinates:", { lat, lng });
-
-        if (isNaN(lat) || isNaN(lng)) {
-            console.log("Invalid coordinates detected");
-            return res.status(400).json({ message: "Invalid coordinates provided" });
+        if (isNaN(latitude) || isNaN(longitude)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid coordinates provided"
+            });
         }
 
-        // Validate coordinate ranges
-        if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-            console.log("Coordinates out of range:", { lat, lng });
-            return res.status(400).json({ message: "Coordinates out of valid range" });
-        }
+        // Find all hospitals
+        const hospitals = await HospitalModel.find({})
+            .populate('doctors', 'firstName lastName specialization experience consultationFee languages bio availability');
 
-        console.log("Querying with coordinates:", { lat, lng, radius });
-
-        // First find the hospitals
-        const hospitals = await HospitalModel.find({
-            location: {
-                $near: {
-                    $geometry: {
-                        type: "Point",
-                        coordinates: [lng, lat]
-                    },
-                    $maxDistance: radius * 1000 // Convert km to meters
-                }
-            }
-        }).populate({
-            path: 'doctors',
-            model: 'DoctorProfile',
-            populate: {
-                path: 'user',
-                select: 'firstName lastName email'
-            }
-        });
-
-        console.log("Found hospitals:", hospitals.length);
-
-        // Transform the hospitals data
-        const transformedHospitals = hospitals.map(hospital => {
-            const transformedDoctors = hospital.doctors.map(doctor => ({
-                _id: doctor._id,
-                name: `${doctor.user.firstName} ${doctor.user.lastName}`,
-                specialization: doctor.specialization,
-                experience: doctor.experience,
-                consultationFee: doctor.consultationFee,
-                languages: doctor.languages,
-                bio: doctor.bio,
-                availability: doctor.availability
-            }));
-
+        // Calculate distance and filter nearby hospitals (within 10km)
+        const nearbyHospitals = hospitals.map(hospital => {
+            const distance = calculateDistance(
+                latitude,
+                longitude,
+                hospital.location.coordinates[1], // latitude
+                hospital.location.coordinates[0]  // longitude
+            );
             return {
                 ...hospital.toObject(),
-                doctors: transformedDoctors
+                distance
             };
-        });
+        }).filter(hospital => hospital.distance <= 10); // Within 10km
 
-        console.log("Final transformed hospitals:", JSON.stringify(transformedHospitals, null, 2));
+        // Sort by distance
+        nearbyHospitals.sort((a, b) => a.distance - b.distance);
 
-        res.status(200).json({ 
+        res.status(200).json({
             success: true,
-            data: transformedHospitals 
+            hospitals: nearbyHospitals
         });
     } catch (error) {
-        console.error("Error in GetnearBy:", error);
-        res.status(500).json({ 
+        console.error('Error finding nearby hospitals:', error);
+        res.status(500).json({
             success: false,
-            message: "Error finding nearby hospitals", 
-            error: error.message 
+            message: 'Failed to find nearby hospitals',
+            error: error.message
         });
     }
+};
+
+// Helper function to calculate distance between two points using Haversine formula
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Radius of the earth in km
+    const dLat = deg2rad(lat2 - lat1);
+    const dLon = deg2rad(lon2 - lon1);
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    const distance = R * c; // Distance in km
+    return distance;
 }
+
+function deg2rad(deg) {
+    return deg * (Math.PI/180);
+}
+
 //hospital-C
 export async function addDoctor(req, res) {
     try {
