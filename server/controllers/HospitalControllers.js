@@ -124,30 +124,25 @@ export const GetnearBy = async (req, res) => {
             });
         }
 
-        // Find all hospitals
-        const hospitals = await HospitalModel.find({})
-            .populate('doctors', 'firstName lastName specialization experience consultationFee languages bio availability');
-
-        // Calculate distance and filter nearby hospitals (within 10km)
-        const nearbyHospitals = hospitals.map(hospital => {
-            const distance = calculateDistance(
-                latitude,
-                longitude,
-                hospital.location.coordinates[1], // latitude
-                hospital.location.coordinates[0]  // longitude
-            );
-            return {
-                ...hospital.toObject(),
-                distance
-            };
-        }).filter(hospital => hospital.distance <= 10); // Within 10km
-
-        // Sort by distance
-        nearbyHospitals.sort((a, b) => a.distance - b.distance);
+        // Find hospitals within 10km using MongoDB's $near operator
+        const hospitals = await HospitalModel.find({
+            location: {
+                $near: {
+                    $geometry: {
+                        type: "Point",
+                        coordinates: [longitude, latitude]
+                    },
+                    $maxDistance: 10000 // 10km in meters
+                }
+            }
+        }).populate({
+            path: 'doctors',
+            select: 'firstName lastName specialization experience consultationFee languages bio availability'
+        });
 
         res.status(200).json({
             success: true,
-            hospitals: nearbyHospitals
+            hospitals: hospitals
         });
     } catch (error) {
         console.error('Error finding nearby hospitals:', error);
