@@ -35,9 +35,6 @@ const callAPI = async (endpoint, data, headers = {}) => {
         if (!API_KEY) {
             throw new Error('OpenAI API key is not configured');
         }
-
-        console.log('Making API call to:', `${API_BASE_URL}${endpoint}`);
-        console.log('API Key present:', !!API_KEY);
         
         const response = await axios.post(`${API_BASE_URL}${endpoint}`, data, {
             headers: {
@@ -50,8 +47,6 @@ const callAPI = async (endpoint, data, headers = {}) => {
         return response.data;
     } catch (error) {
         console.error(`API Error (${endpoint}):`, error.response?.data || error.message);
-        console.error('Error status:', error.response?.status);
-        console.error('Error headers:', error.response?.headers);
         throw error;
     }
 };
@@ -96,26 +91,8 @@ apiRouter.post('/chat', async (req, res) => {
 
         console.log('Sending chat message:', message);
 
-        // Check if API key is available
-        if (!API_KEY) {
-            console.log('No API key available, using fallback response');
-            // Fallback response for testing
-            const fallbackResponse = `I'm a medical AI assistant. You said: "${message}". 
-            Since the AI service is not currently configured, I can provide general medical information, but for specific medical advice, please consult with a healthcare professional.
-            
-            Common medical topics I can help with:
-            - General health information
-            - Symptom explanations
-            - Medical terminology
-            - Preventive care tips
-            
-            What specific medical question do you have?`;
-            
-            return res.json({ response: fallbackResponse });
-        }
-
         const apiResponse = await callAPI('/chat/completions', {
-            model: "gpt-4o",
+            model: "gpt-3.5-turbo",
             messages: [
                 { role: "user", content: message }
             ]
@@ -131,16 +108,6 @@ apiRouter.post('/chat', async (req, res) => {
 
     } catch (error) {
         console.error('Chat error:', error.response?.data || error.message);
-        
-        // If it's an authentication error, provide a helpful message
-        if (error.response?.status === 401) {
-            return res.status(500).json({
-                error: 'AI service authentication failed',
-                details: 'The AI service is not properly configured. Please check the API key configuration.',
-                fallback: 'You can still use the chat for general medical information, but AI responses are currently unavailable.'
-            });
-        }
-        
         res.status(500).json({
             error: 'Failed to process chat message',
             details: error.response?.data || error.message
@@ -161,7 +128,7 @@ apiRouter.post('/analyze-image', async (req, res) => {
         const extractedText = ocrResponse.pages[0].text;
 
         const analysisResponse = await callAPI('/chat/completions', {
-            model: "gpt-4o",
+            model: "gpt-3.5-turbo",
             messages: [
                 {
                     role: "system",
