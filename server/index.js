@@ -16,7 +16,8 @@ import cookieParser from 'cookie-parser';
 dotenv.config();
 console.log('Environment variables:', {
     PORT: process.env.PORT,
-    MONGO_URL: process.env.MONGO_URL
+    MONGO_URL: process.env.MONGO_URL,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY
 });
 
 // OpenAI API configuration
@@ -195,13 +196,11 @@ apiRouter.post('/analyze-image', async (req, res) => {
 // Mount API routes FIRST
 app.use('/api', apiRouter);
 
-// Debug middleware to log all requests
 app.use((req, res, next) => {
     console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
     next();
 });
 
-// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/hospital', hospitalRoutes);
 app.use('/api/doctors', middleware, doctorRoutes);
