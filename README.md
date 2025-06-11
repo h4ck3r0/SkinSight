@@ -1,6 +1,6 @@
 ﻿# SkinSight
 
-SkinSight is a modern healthcare management platform that connects patients, doctors, and hospitals. It enables patients to find nearby hospitals, book appointments, join real-time queues, and manage their healthcare journey efficiently.
+SkinSight is a modern healthcare management platform that connects patients, doctors, and hospitals. It enables patients to find nearby hospitals, book appointments, join real-time queues, and manage their healthcare journey efficiently
 
 ## Features
 
