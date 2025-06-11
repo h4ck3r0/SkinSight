@@ -21,7 +21,6 @@ console.log('Environment variables:', {
 const app = express();
 const server = createServer(app);
 
-// Initialize Socket.IO
 const io = SetupSocket(server);
 
 app.use(express.json());
@@ -49,10 +48,8 @@ app.get("/health", (req, res) => {
     res.status(200).json({ status: 'healthy' });
 });
 
-// Make io accessible to routes
 app.set('io', io);
 
-// Error handling middleware
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({
@@ -65,7 +62,6 @@ mongoose
     .connect(process.env.MONGO_URL)
     .then(() => {
         console.log("Connected to MongoDB");
-        // Start server
         const PORT = process.env.PORT || 5000;
         server.listen(PORT, () => {
             console.log(`Server is running on port ${PORT}`);

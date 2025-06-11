@@ -358,7 +358,6 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
         };
     }, [socket, doctorId, hospitalId, user._id, role]);
 
-    // Video call functions (moved outside useEffect for JSX access)
     const handleRequestVideoCall = () => {
         if (!isConnected) {
             toast.error('Not connected to server');
@@ -387,7 +386,6 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
         
         setIsVideoCallStateChanging(true);
         
-        // Set this user as the call initiator
         setCallInitiator(user._id);
         
         socket.emit('requestVideoCall', {
@@ -402,7 +400,6 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             remoteUserId
         });
         
-        // Reset the debounce after a short delay
         setTimeout(() => {
             setIsVideoCallStateChanging(false);
         }, 1000);

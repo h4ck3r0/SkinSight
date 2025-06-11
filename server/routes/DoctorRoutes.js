@@ -15,7 +15,6 @@ import { middleware } from '../middleware/middleware.js';
 
 const router = express.Router();
 
-// Protected routes - require authentication
 router.post("/profile", middleware, createDoctorProfile);
 router.get("/profile", middleware, getDoctorProfile);
 router.put("/profile", middleware, updateDoctorProfile);
@@ -26,7 +25,6 @@ router.get("/appointments", middleware, getDoctorAppointments);
 router.put("/appointments/:appointmentId/approve", middleware, approveAppointment);
 router.put("/update-hospital/:id", middleware, updateDoctorHospital);
 
-// Public route
 router.get("/getall", getAllDoctors);
 
 export default router;

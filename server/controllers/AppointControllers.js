@@ -200,10 +200,8 @@ export async function getDoctorAppointments(req, res) {
     }
 }
 
-// Helper function to create appointments from doctor profile time slots
 async function createAppointmentsFromProfile(doctorId) {
     try {
-        // Find doctor profile by user ID
         const doctorProfile = await DocterModel.findOne({ user: doctorId });
         if (!doctorProfile || !doctorProfile.appointments) {
             return [];
@@ -244,7 +242,6 @@ async function createAppointmentsFromProfile(doctorId) {
             }
         }
 
-        // Return all appointments for this doctor
         return await Appointment.find({ doctor: doctorId })
             .populate('patient', 'firstName lastName email')
             .populate('hospital', 'name')

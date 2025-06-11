@@ -261,11 +261,9 @@ export async function approveAppointment(req, res) {
 
 export async function getAllDoctors(req, res) {
     try {
-        // First find all users who are doctors
         const doctorUsers = await UserModel.find({ role: 'doctor' });
         console.log("Found doctor users:", doctorUsers.length);
 
-        // Then find all doctor profiles for these users
         const doctors = await DocterModel.find({
             user: { $in: doctorUsers.map(u => u._id) }
         }).populate({
@@ -281,7 +279,6 @@ export async function getAllDoctors(req, res) {
         console.log("Found doctor profiles:", doctors.length);
 
         const transformedDoctors = doctors.map(doctor => {
-            // Get hospital data from user's hospitalId
             const hospitalData = doctor.user.hospitalId ? {
                 _id: doctor.user.hospitalId._id,
                 name: doctor.user.hospitalId.name,
@@ -333,19 +330,13 @@ export async function updateHospital(req, res) {
         const { id } = req.params;
         const { hospitalId } = req.body;
 
-        // Find the user
         const user = await UserModel.findById(id);
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
-
-        // Verify user is a doctor
         if (user.role !== "doctor") {
             return res.status(400).json({ message: "User is not a doctor" });
-        }
-
-        // Find the hospital
-        const hospital = await HospitalModel.findById(hospitalId);
+        }        const hospital = await HospitalModel.findById(hospitalId);
         if (!hospital) {
             return res.status(404).json({ message: "Hospital not found" });
         }
@@ -354,10 +345,10 @@ export async function updateHospital(req, res) {
             console.log("Creating new doctor profile for user:", id);
             doctorProfile = await DocterModel.create({
                 user: id,
-                specialization: "General Medicine", // Default specialization
+                specialization: "General Medicine",
                 qualifications: [],
                 experience: 0,
-                consultationFee: 500, // Default fee
+                consultationFee: 500, 
                 availability: [
                     {
                         day: "Monday",
@@ -379,17 +370,15 @@ export async function updateHospital(req, res) {
             });
         }
 
-        // Update user's hospitalId
+    
         user.hospitalId = hospitalId;
         await user.save();
 
-        // Add doctor to hospital's doctors array if not already there
+        
         if (!hospital.doctors.includes(doctorProfile._id)) {
             hospital.doctors.push(doctorProfile._id);
             await hospital.save();
         }
-
-        // Get populated hospital data
         const populatedHospital = await HospitalModel.findById(hospitalId)
             .populate({
                 path: 'doctors',

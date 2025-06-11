@@ -6,18 +6,13 @@ export async function createHospital(req, res) {
     try {
         const { name, phone, address, location, email, service } = req.body;
         
-        // Validate required fields
         if (!name || !phone || !address || !email || !location) {
             return res.status(400).json({ message: "All required fields must be provided" });
         }
-
-        // Check if hospital with same email exists
         const existingHospital = await HospitalModel.findOne({ email });
         if (existingHospital) {
             return res.status(400).json({ message: "Hospital with this email already exists" });
         }
-
-        // Create hospital
         const hospital = await HospitalModel.create({
             name,
             phone,
@@ -26,8 +21,6 @@ export async function createHospital(req, res) {
             email,
             service: service || []
         });
-
-        // Update user's hospitalId if user is provided
         if (req.user) {
             await UserModel.findByIdAndUpdate(req.user._id, { hospitalId: hospital._id });
         }
@@ -68,8 +61,6 @@ export const getHospitals = async (req, res) => {
 export const getHospital = async (req, res) => {
     try {
         const { id } = req.params;
-        
-        // Check if the request is for 'getall'
         if (id === 'getall') {
             return getHospitals(req, res);
         }
@@ -126,8 +117,6 @@ export async function deleteHospital(req,res){
 export const GetnearBy = async (req, res) => {
     try {
         const { lat, lng } = req.params;
-        
-        // Validate coordinates
         const latitude = parseFloat(lat);
         const longitude = parseFloat(lng);
         
@@ -139,16 +128,14 @@ export const GetnearBy = async (req, res) => {
         }
 
         console.log("Searching for hospitals near:", { latitude, longitude });
-
-        // Find hospitals within 10km using MongoDB's $near operator
         const hospitals = await HospitalModel.find({
             location: {
                 $near: {
                     $geometry: {
                         type: "Point",
-                        coordinates: [longitude, latitude] // MongoDB expects [longitude, latitude]
+                        coordinates: [longitude, latitude] 
                     },
-                    $maxDistance: 10000 // 10km in meters
+                    $maxDistance: 10000 
                 }
             }
         }).populate({
@@ -162,7 +149,6 @@ export const GetnearBy = async (req, res) => {
 
         console.log("Found hospitals:", hospitals.length);
 
-        // If no hospitals found within 10km, get all hospitals
         if (hospitals.length === 0) {
             console.log("No nearby hospitals found, returning all hospitals");
             const allHospitals = await HospitalModel.find().populate({
@@ -194,9 +180,8 @@ export const GetnearBy = async (req, res) => {
     }
 };
 
-// Helper function to calculate distance between two points using Haversine formula
 function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Radius of the earth in km
+    const R = 6371; 
     const dLat = deg2rad(lat2 - lat1);
     const dLon = deg2rad(lon2 - lon1);
     const a = 
@@ -204,7 +189,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
         Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
         Math.sin(dLon/2) * Math.sin(dLon/2); 
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-    const distance = R * c; // Distance in km
+    const distance = R * c; 
     return distance;
 }
 
@@ -218,7 +203,6 @@ export async function addDoctor(req, res) {
         const { id: hospitalId, userId } = req.params;
         console.log("Adding doctor to hospital:", { hospitalId, userId });
 
-        // Find hospital and user
         const hospital = await HospitalModel.findById(hospitalId);
         const user = await UserModel.findById(userId);
 
@@ -232,24 +216,21 @@ export async function addDoctor(req, res) {
             return res.status(404).json({ message: "User not found" });
         }
 
-        // Verify user is a doctor
         if (user.role !== "doctor") {
             console.log("User is not a doctor:", userId);
             return res.status(400).json({ message: "User is not a doctor" });
         }
 
-        // Check if doctor profile exists
         let doctorProfile = await DocterModel.findOne({ user: userId });
         
         if (!doctorProfile) {
             console.log("Creating new doctor profile for user:", userId);
-            // Create a new doctor profile
             doctorProfile = await DocterModel.create({
                 user: userId,
-                specialization: "General Medicine", // Default specialization
+                specialization: "General Medicine", 
                 qualifications: [],
                 experience: 0,
-                consultationFee: 500, // Default fee
+                consultationFee: 500, 
                 availability: [
                     {
                         day: "Monday",
@@ -271,21 +252,17 @@ export async function addDoctor(req, res) {
             });
         }
 
-        // Check if doctor is already in hospital
         if (hospital.doctors.includes(doctorProfile._id)) {
             console.log("Doctor already in hospital:", doctorProfile._id);
             return res.status(400).json({ message: "Doctor already in hospital" });
         }
 
-        // Add doctor to hospital
         hospital.doctors.push(doctorProfile._id);
         await hospital.save();
 
-        // Update user's hospitalId
         user.hospitalId = hospitalId;
         await user.save();
 
-        // Get populated hospital data
         const populatedHospital = await HospitalModel.findById(hospitalId)
             .populate({
                 path: 'doctors',
@@ -359,7 +336,6 @@ export async function removeDoctor(req, res) {
             });
         }
 
-        // Remove doctor from hospital's doctors array
         hospital.doctors = hospital.doctors.filter(docId => docId.toString() !== userId);
         await hospital.save();
 

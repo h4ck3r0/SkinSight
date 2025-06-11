@@ -4,12 +4,10 @@ import { middleware } from '../middleware/middleware.js';
 
 const router = express.Router();
 
-// Public routes
 router.get('/nearby/:lat/:lng', GetnearBy);
 router.get('/', getHospitals);
 router.get('/:id', getHospital);
 
-// Protected routes
 router.post('/', middleware, createHospital);
 router.put('/:id', middleware, updateHospital);
 router.delete('/:id', middleware, deleteHospital);

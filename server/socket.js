@@ -21,7 +21,6 @@ export const SetupSocket = (server) => {
         allowEIO3: true
     });
 
-    // Queue management
     const queues = new Map();
 
     const createQueue = (doctorId, hospitalId) => {
@@ -85,13 +84,12 @@ export const SetupSocket = (server) => {
             try {
                 const position = addToQueue(doctorId, hospitalId, patientId);
                 if (position !== null) {
-                    // Notify the patient of their position
+            
                     socket.to(patientId).emit('positionUpdate', {
                         position,
-                        estimatedWaitTime: position * 15 // 15 minutes per patient
+                        estimatedWaitTime: position * 15 
                     });
-
-                    // Notify everyone about the queue update
+e
                     io.to(doctorId).emit('queueUpdate', {
                         doctorId,
                         hospitalId,
@@ -106,7 +104,6 @@ export const SetupSocket = (server) => {
 
         socket.on('leaveQueue', ({ doctorId, hospitalId, patientId }) => {
             if (removeFromQueue(doctorId, hospitalId, patientId)) {
-                // Notify everyone about the queue update
                 io.to(doctorId).emit('queueUpdate', {
                     doctorId,
                     hospitalId,
@@ -125,14 +122,12 @@ export const SetupSocket = (server) => {
 
                 console.log('Calling patient:', nextPatient);
 
-                // Notify the patient
                 io.to(nextPatient).emit('patientCalled', {
                     doctorId,
                     hospitalId,
                     patientId: nextPatient
                 });
 
-                // Notify the doctor about the patient being called
                 io.to(doctorId).emit('patientCalled', {
                     doctorId,
                     hospitalId,
@@ -141,7 +136,6 @@ export const SetupSocket = (server) => {
 
                 console.log(`Sent patientCalled to patient ${nextPatient} and doctor ${doctorId}`);
 
-                // Notify everyone about the queue update
                 io.to(doctorId).emit('queueUpdate', {
                     doctorId,
                     hospitalId,
@@ -185,11 +179,9 @@ export const SetupSocket = (server) => {
             });
         });
 
-        // Online consultation handlers
         socket.on('toggleOnlineMode', ({ doctorId, hospitalId, patientId, isOnline }) => {
             console.log('Toggle online mode event:', { doctorId, hospitalId, patientId, isOnline });
             
-            // Notify both doctor and patient about online mode change
             io.to(doctorId).emit('onlineModeToggle', {
                 doctorId,
                 hospitalId,
@@ -207,7 +199,6 @@ export const SetupSocket = (server) => {
         });
 
         socket.on('sendMessage', ({ doctorId, hospitalId, sender, receiver, message }) => {
-            // Send message to both sender and receiver
             io.to(sender).emit('newMessage', {
                 sender,
                 receiver,
@@ -223,7 +214,6 @@ export const SetupSocket = (server) => {
         });
 
         socket.on('requestVideoCall', ({ doctorId, hospitalId, patientId }) => {
-            // Notify the patient about video call request
             io.to(patientId).emit('videoCallRequest', {
                 doctorId,
                 hospitalId,
@@ -232,7 +222,6 @@ export const SetupSocket = (server) => {
         });
 
         socket.on('videoCallResponse', ({ doctorId, hospitalId, patientId, accepted }) => {
-            // Notify the doctor about video call response
             io.to(doctorId).emit('videoCallResponse', {
                 doctorId,
                 hospitalId,
@@ -242,7 +231,6 @@ export const SetupSocket = (server) => {
         });
 
         socket.on('endVideoCall', ({ doctorId, hospitalId, patientId }) => {
-            // Notify both parties that video call ended
             io.to(doctorId).emit('videoCallEnded', {
                 doctorId,
                 hospitalId,
