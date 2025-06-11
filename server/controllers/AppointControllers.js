@@ -176,13 +176,15 @@ export async function getDoctorAppointments(req, res) {
         const { doctorId } = req.params;
         console.log("Fetching appointments for doctor:", doctorId);
         
-        const appointments = await Appointment.find({ doctor: doctorId })
+        let appointments = await Appointment.find({ doctor: doctorId })
             .populate('patient', 'firstName lastName email')
             .populate('hospital', 'name')
             .sort({ appointmentDate: 1, appointmentTime: 1 });
 
-        if (!appointments) {
-            return res.status(404).json({ message: "No appointments found" });
+        // If no appointments found, create them from doctor profile time slots
+        if (!appointments || appointments.length === 0) {
+            console.log("No appointments found, creating from profile time slots...");
+            appointments = await createAppointmentsFromProfile(doctorId);
         }
 
         res.status(200).json({ 
@@ -195,6 +197,62 @@ export async function getDoctorAppointments(req, res) {
             message: "Error retrieving appointments",
             error: err.message
         });
+    }
+}
+
+// Helper function to create appointments from doctor profile time slots
+async function createAppointmentsFromProfile(doctorId) {
+    try {
+        // Find doctor profile by user ID
+        const doctorProfile = await DocterModel.findOne({ user: doctorId });
+        if (!doctorProfile || !doctorProfile.appointments) {
+            return [];
+        }
+
+        const createdAppointments = [];
+
+        // Create appointment records from profile time slots
+        for (const slot of doctorProfile.appointments) {
+            if (!slot.isAvailable) { // Only booked slots
+                // Create appointment date and time
+                const appointmentDate = new Date(slot.date);
+                const [hours, minutes] = slot.startTime.split(':').map(Number);
+                const appointmentDateTime = new Date(appointmentDate);
+                appointmentDateTime.setHours(hours, minutes, 0, 0);
+
+                // Check if appointment already exists
+                const existingAppointment = await Appointment.findOne({
+                    doctor: doctorId,
+                    appointmentTime: appointmentDateTime
+                });
+
+                if (!existingAppointment) {
+                    // Create new appointment record
+                    const appointment = new Appointment({
+                        doctor: doctorId,
+                        patient: doctorId, // Use doctor ID as placeholder patient
+                        hospital: doctorProfile.hospital || null,
+                        appointmentTime: appointmentDateTime,
+                        appointmentDate: appointmentDate,
+                        reason: "Appointment from profile time slot",
+                        status: 'pending'
+                    });
+
+                    await appointment.save();
+                    createdAppointments.push(appointment);
+                }
+            }
+        }
+
+        // Return all appointments for this doctor
+        return await Appointment.find({ doctor: doctorId })
+            .populate('patient', 'firstName lastName email')
+            .populate('hospital', 'name')
+            .sort({ appointmentDate: 1, appointmentTime: 1 });
+
+    } catch (error) {
+        console.error("Error creating appointments from profile:", error);
+        return [];
     }
 }
 

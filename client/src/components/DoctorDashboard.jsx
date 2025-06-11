@@ -98,20 +98,14 @@ const DoctorDashboard = () => {
                 setAppointments(response.data.appointments);
                 console.log('Doctor appointments fetched:', response.data.appointments);
             } else {
-                console.log('No appointments found or invalid response:', response.data);
+                console.log('No appointments found');
                 setAppointments([]);
             }
         } catch (error) {
             console.error('Error fetching doctor appointments:', error);
             console.error('Error response:', error.response);
-            
-            if (error.response?.status === 404) {
-                console.log('No appointments found for this doctor');
-                setAppointments([]);
-            } else {
-                toast.error('Failed to fetch appointments');
-                setAppointments([]);
-            }
+            toast.error('Failed to fetch appointments');
+            setAppointments([]);
         }
     };
 
@@ -344,9 +338,6 @@ const DoctorDashboard = () => {
                                                 </p>
                                                 {appointment.reason && (
                                                     <p className="text-gray-600">Reason: {appointment.reason}</p>
-                                                )}
-                                                {appointment.approvalMessage && (
-                                                    <p className="text-gray-600">Message: {appointment.approvalMessage}</p>
                                                 )}
                                             </div>
                                             <div className="flex gap-2">
