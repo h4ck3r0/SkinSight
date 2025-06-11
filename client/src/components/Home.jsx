@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ImageSlider from './ImageSlider';
 import {
-  Heart,
+  SmilePlus,
   Calendar,
   Clock,
   User,
@@ -151,7 +151,7 @@ const Home = () => {
 
           <div className="text-center mb-8">
             <div className="w-20 h-20 bg-[#2C3E50] rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <Heart className="w-10 h-10 text-[#A6DCEF]" />
+              <SmilePlus className="w-10 h-10 text-[#A6DCEF]" />
             </div>
             <h2 className="text-3xl font-bold text-[#2C3E50] mb-4">
               {type === 'signup' ? 'Create Account' : 'Welcome Back'}
@@ -263,7 +263,7 @@ const Home = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="p-2 rounded-xl bg-[#2C3E50]">
-                <Heart className="w-6 h-6 text-[#A6DCEF]" />
+                <SmilePlus className="w-6 h-6 text-[#A6DCEF]" />
               </div>
               <span className="text-2xl font-bold text-[#2C3E50]">
                 SkinSight
@@ -478,7 +478,7 @@ const Home = () => {
           <div>
             <div className="flex items-center space-x-3 mb-6">
               <div className="p-2 rounded-xl bg-[#A6DCEF]">
-                <Heart className="w-6 h-6 text-[#2C3E50]" />
+                <SmilePlus className="w-6 h-6 text-[#2C3E50]" />
               </div>
               <span className="text-2xl font-bold">SkinSight</span>
             </div>
