@@ -3,6 +3,7 @@ import { useGeolocation } from "../hooks/useGeolocation";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import QueueSystem from "./QueueSystem";
+import { toast } from "react-hot-toast";
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com/api';
 
@@ -24,6 +25,12 @@ const PatientDashBroad = () => {
     const [selectedDoctor, setSelectedDoctor] = useState(null);
     const [user, setUser] = useState(null);
     const [appointments, setAppointments] = useState([]);
+    
+    // Appointment form state
+    const [appointmentDate, setAppointmentDate] = useState('');
+    const [appointmentTime, setAppointmentTime] = useState('');
+    const [appointmentReason, setAppointmentReason] = useState('');
+    const [showAppointmentForm, setShowAppointmentForm] = useState(false);
 
     useEffect(() => {
         const storedUser = localStorage.getItem('user');
@@ -74,6 +81,15 @@ const PatientDashBroad = () => {
                 const hospitalList = response.data.hospitals || [];
                 console.log("Setting hospitals:", hospitalList);
                 setHospitals(hospitalList);
+                
+                // Create doctors map
+                const doctorsMap = {};
+                hospitalList.forEach(hospital => {
+                    if (hospital.doctors && Array.isArray(hospital.doctors)) {
+                        doctorsMap[hospital._id] = hospital.doctors;
+                    }
+                });
+                setDoctorsMap(doctorsMap);
             } else {
                 console.error("Invalid response format:", response.data);
                 setError("Failed to fetch hospitals. Please try again.");
@@ -97,6 +113,15 @@ const PatientDashBroad = () => {
                 const hospitalList = response.data.hospitals;
                 setAllHospitals(hospitalList);
                 SetgetAll(!isgetAll);
+                
+                // Create doctors map for all hospitals
+                const doctorsMap = {};
+                hospitalList.forEach(hospital => {
+                    if (hospital.doctors && Array.isArray(hospital.doctors)) {
+                        doctorsMap[hospital._id] = hospital.doctors;
+                    }
+                });
+                setDoctorsMap(prev => ({ ...prev, ...doctorsMap }));
             }
         } catch (err) {
             console.error("Error fetching all hospitals:", err);
@@ -106,49 +131,81 @@ const PatientDashBroad = () => {
         }
     };
 
-    const handleAppointment = async (hospital, doctor) => {
+    const handleBookAppointment = (hospital, doctor) => {
+        setSelectedHospital(hospital);
+        setSelectedDoctor(doctor);
+        setShowAppointmentForm(true);
+        setAppointmentDate('');
+        setAppointmentTime('');
+        setAppointmentReason('');
+    };
+
+    const handleJoinQueue = (hospital, doctor) => {
+        setSelectedHospital(hospital);
+        setSelectedDoctor(doctor);
+        setActiveTab('queue');
+    };
+
+    const handleAppointmentSubmit = async (e) => {
+        e.preventDefault();
+        
+        if (!selectedDoctor?._id || !selectedHospital?._id) {
+            toast.error("Please select a doctor and hospital");
+            return;
+        }
+
+        if (!appointmentDate || !appointmentTime || !appointmentReason) {
+            toast.error("Please fill in all appointment details");
+            return;
+        }
+
+        setLoading(true);
+        setError(null);
+        
         try {
-            setLoading(true);
-            setError(null);
-
-            if (!doctor?._id) {
-                setError("Doctor ID is missing. Please try again.");
-                return;
-            }
-
-            if (!user?._id) {
-                setError("User not logged in. Please login again.");
-                return;
-            }
-
-            const now = new Date();
-            const date = now.toISOString().split('T')[0];
-            const time = "09:00";
-
+            const token = localStorage.getItem('token');
             const response = await axios.post(
                 `${API_URL}/appointments/create`,
                 {
-                    doctor: doctor._id,
+                    doctor: selectedDoctor._id,
                     patient: user._id,
-                    hospital: hospital._id,
-                    appointmentTime: time,
-                    appointmentDate: date,
-                    reason: "General checkup"
+                    hospital: selectedHospital._id,
+                    appointmentDate,
+                    appointmentTime,
+                    reason: appointmentReason
                 },
                 {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
                     }
                 }
             );
 
-            if (response.data && response.data.appointment) {
-                alert("Appointment created successfully!");
+            if (response.data) {
+                toast.success("Appointment created successfully!");
+                setShowAppointmentForm(false);
+                setAppointmentDate('');
+                setAppointmentTime('');
+                setAppointmentReason('');
+                setSelectedHospital(null);
+                setSelectedDoctor(null);
+                // Refresh appointments
                 fetchAppointments(user._id);
             }
         } catch (err) {
             console.error("Error creating appointment:", err);
-            setError(err.response?.data?.message || "Failed to create appointment. Please try again.");
+            const errorMessage = err.response?.data?.message || "Failed to create appointment";
+            
+            // Handle specific error for unavailable time slot
+            if (err.response?.data?.nextAvailableSlot) {
+                const nextSlot = err.response.data.nextAvailableSlot;
+                toast.error(`${errorMessage}. Next available slot: ${new Date(nextSlot.date).toLocaleDateString()} at ${nextSlot.startTime}`);
+            } else {
+                toast.error(errorMessage);
+            }
+            
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -157,7 +214,15 @@ const PatientDashBroad = () => {
     const fetchAppointments = async (userId) => {
         try {
             setLoading(true);
-            const response = await axios.get(`${API_URL}/appointments/patient/${userId}`);
+            const token = localStorage.getItem('token');
+            const response = await axios.get(
+                `${API_URL}/appointments/patient/${userId}`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                }
+            );
             if (response.data && response.data.appointments) {
                 setAppointments(response.data.appointments);
             } else {
@@ -169,12 +234,6 @@ const PatientDashBroad = () => {
         } finally {
             setLoading(false);
         }
-    };
-
-    const handleJoinQueue = (hospital, doctor) => {
-        setSelectedHospital(hospital);
-        setSelectedDoctor(doctor);
-        setActiveTab('queue');
     };
 
     // Enhanced hospital selection for queue
@@ -333,19 +392,23 @@ const PatientDashBroad = () => {
                                                         )}
                                                         
                                                         <div className="flex gap-2 mt-3">
-                                                            <button
-                                                                onClick={() => handleAppointment(hospital, doctor)}
-                                                                disabled={loading}
-                                                                className="bg-[#2C3E50] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 shadow-sm hover:shadow-md transition-all duration-200"
-                                                            >
-                                                                {loading ? 'Booking...' : 'Book Appointment'}
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleJoinQueue(hospital, doctor)}
-                                                                className="bg-[#2C3E50] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 shadow-sm hover:shadow-md transition-all duration-200"
-                                                            >
-                                                                Join Queue
-                                                            </button>
+                                                            {doctor._id && (
+                                                                <button
+                                                                    onClick={() => handleBookAppointment(hospital, doctor)}
+                                                                    disabled={loading}
+                                                                    className="bg-[#2C3E50] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 shadow-sm hover:shadow-md transition-all duration-200"
+                                                                >
+                                                                    {loading ? 'Booking...' : 'Book Appointment'}
+                                                                </button>
+                                                            )}
+                                                            {doctor._id && (
+                                                                <button
+                                                                    onClick={() => handleJoinQueue(hospital, doctor)}
+                                                                    className="bg-[#2C3E50] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 shadow-sm hover:shadow-md transition-all duration-200"
+                                                                >
+                                                                    Join Queue
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 );
@@ -484,6 +547,81 @@ const PatientDashBroad = () => {
                             role="patient"
                         />
                     )}
+                </div>
+            )}
+
+            {/* Appointment Booking Modal */}
+            {showAppointmentForm && selectedDoctor && selectedHospital && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                        <h3 className="text-xl font-semibold mb-4 text-[#2C3E50]">
+                            Book Appointment with Dr. {
+                                selectedDoctor.user ? 
+                                    `${selectedDoctor.user.firstName} ${selectedDoctor.user.lastName}` : 
+                                    (selectedDoctor.firstName ? `${selectedDoctor.firstName} ${selectedDoctor.lastName}` : selectedDoctor.name || 'Unknown')
+                            }
+                        </h3>
+                        <form onSubmit={handleAppointmentSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                                <input
+                                    type="date"
+                                    value={appointmentDate}
+                                    onChange={(e) => setAppointmentDate(e.target.value)}
+                                    min={new Date().toISOString().split('T')[0]}
+                                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#2C3E50]"
+                                    required
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Time (24-hour format)</label>
+                                <input
+                                    type="time"
+                                    value={appointmentTime}
+                                    onChange={(e) => setAppointmentTime(e.target.value)}
+                                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#2C3E50]"
+                                    required
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Enter time in 24-hour format (e.g., 14:30 for 2:30 PM)</p>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Visit</label>
+                                <textarea
+                                    value={appointmentReason}
+                                    onChange={(e) => setAppointmentReason(e.target.value)}
+                                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#2C3E50]"
+                                    rows="3"
+                                    placeholder="Please describe your symptoms or reason for visit..."
+                                    required
+                                />
+                            </div>
+                            <div className="flex justify-end space-x-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowAppointmentForm(false);
+                                        setSelectedHospital(null);
+                                        setSelectedDoctor(null);
+                                        setAppointmentDate('');
+                                        setAppointmentTime('');
+                                        setAppointmentReason('');
+                                    }}
+                                    className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="px-4 py-2 bg-[#2C3E50] text-white rounded hover:opacity-90 disabled:opacity-50"
+                                >
+                                    {loading ? 'Creating...' : 'Create Appointment'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             )}
             </div>

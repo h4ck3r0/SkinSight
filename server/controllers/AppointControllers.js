@@ -11,6 +11,9 @@ export async function createAppointment(req, res) {
             return res.status(404).json({ message: "Doctor profile not found" });
         }
 
+        // Use the doctor's user ID instead of profile ID for the appointment
+        const doctorUserId = doctorProfile.user;
+
         // Create a proper date object combining date and time
         const [year, month, day] = appointmentDate.split('-').map(Number);
         const [hours, minutes] = appointmentTime.split(':').map(Number);
@@ -28,7 +31,7 @@ export async function createAppointment(req, res) {
         }
 
         const existingAppointment = await Appointment.findOne({
-            doctor,
+            doctor: doctorUserId,
             appointmentTime: appointmentDateTime,
             status: { $in: ['pending', 'confirmed'] }
         });
@@ -42,7 +45,7 @@ export async function createAppointment(req, res) {
         }
 
         const appointment = new Appointment({
-            doctor,
+            doctor: doctorUserId, // Use user ID instead of profile ID
             patient,
             hospital,
             appointmentTime: appointmentDateTime,

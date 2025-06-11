@@ -9,12 +9,14 @@ const DoctorDashboard = () => {
     const { user } = useAuth();
     const { socket } = useSocket();
     const [doctorProfile, setDoctorProfile] = useState(null);
+    const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isSocketConnected, setIsSocketConnected] = useState(false);
 
     useEffect(() => {
         if (user?._id) {
             fetchDoctorProfile();
+            fetchDoctorAppointments();
         }
     }, [user]);
 
@@ -80,18 +82,72 @@ const DoctorDashboard = () => {
         }
     };
 
-    const handleApproveAppointment = async (appointmentId) => {
+    const fetchDoctorAppointments = async () => {
         try {
-            await axios.put(`/doctors/appointments/${appointmentId}/approve`, {}, {
+            console.log('Fetching appointments for doctor ID:', user._id);
+            
+            const response = await axios.get(`/appointments/doctor/${user._id}`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 }
             });
-            toast.success('Appointment approved');
-            fetchDoctorProfile(); // Refresh profile to get updated appointments
+            
+            console.log('Full response:', response);
+            
+            if (response.data && response.data.appointments) {
+                setAppointments(response.data.appointments);
+                console.log('Doctor appointments fetched:', response.data.appointments);
+            } else {
+                console.log('No appointments found or invalid response:', response.data);
+                setAppointments([]);
+            }
+        } catch (error) {
+            console.error('Error fetching doctor appointments:', error);
+            console.error('Error response:', error.response);
+            
+            if (error.response?.status === 404) {
+                console.log('No appointments found for this doctor');
+                setAppointments([]);
+            } else {
+                toast.error('Failed to fetch appointments');
+                setAppointments([]);
+            }
+        }
+    };
+
+    const handleApproveAppointment = async (appointmentId) => {
+        try {
+            await axios.put(`/doctors/appointments/${appointmentId}/approve`, {
+                approvalStatus: 'approved',
+                approvalMessage: 'Appointment approved by doctor'
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                }
+            });
+            toast.success('Appointment approved successfully');
+            fetchDoctorAppointments(); // Refresh appointments
         } catch (error) {
             console.error('Error approving appointment:', error);
             toast.error('Failed to approve appointment');
+        }
+    };
+
+    const handleRejectAppointment = async (appointmentId) => {
+        try {
+            await axios.put(`/doctors/appointments/${appointmentId}/approve`, {
+                approvalStatus: 'rejected',
+                approvalMessage: 'Appointment rejected by doctor'
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                }
+            });
+            toast.success('Appointment rejected successfully');
+            fetchDoctorAppointments(); // Refresh appointments
+        } catch (error) {
+            console.error('Error rejecting appointment:', error);
+            toast.error('Failed to reject appointment');
         }
     };
 
@@ -122,18 +178,18 @@ const DoctorDashboard = () => {
         );
     }
 
-    // Filter today's appointments - Fixed logic
+    // Filter today's appointments from actual appointments
     const today = new Date();
     const todayString = today.toDateString();
     
-    const todaysAppointments = doctorProfile?.profile?.appointments?.filter(appointment => {
-        if (!appointment.date) return false;
+    const todaysAppointments = appointments.filter(appointment => {
+        if (!appointment.appointmentDate) return false;
         
-        const appointmentDate = new Date(appointment.date);
+        const appointmentDate = new Date(appointment.appointmentDate);
         const appointmentString = appointmentDate.toDateString();
         
-        return appointmentString === todayString && !appointment.isAvailable;
-    }) || [];
+        return appointmentString === todayString;
+    });
 
     return (
         <div className="min-h-screen bg-[#A6DCEF]/10">
@@ -194,17 +250,37 @@ const DoctorDashboard = () => {
                                                     'Patient Name Not Available'
                                                 }
                                             </h3>
-                                            <p className="text-gray-600">Date: {new Date(appointment.date).toLocaleDateString()}</p>
-                                            <p className="text-gray-600">Time: {appointment.startTime} - {appointment.endTime}</p>
-                                            <p className="text-gray-600">Status: {appointment.status || 'Scheduled'}</p>
+                                            <p className="text-gray-600">Date: {new Date(appointment.appointmentDate).toLocaleDateString()}</p>
+                                            <p className="text-gray-600">Time: {new Date(appointment.appointmentTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                            <p className="text-gray-600">Status: 
+                                                <span className={`ml-1 px-2 py-1 rounded text-xs ${
+                                                    appointment.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                                                    appointment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                                    appointment.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                                    'bg-gray-100 text-gray-800'
+                                                }`}>
+                                                    {appointment.status || 'Scheduled'}
+                                                </span>
+                                            </p>
+                                            {appointment.reason && (
+                                                <p className="text-gray-600">Reason: {appointment.reason}</p>
+                                            )}
                                         </div>
                                         {appointment.status === 'pending' && (
-                                            <button
-                                                onClick={() => handleApproveAppointment(appointment._id)}
-                                                className="bg-[#2C3E50] text-white px-4 py-2 rounded hover:opacity-90 transition-all duration-200"
-                                            >
-                                                Approve
-                                            </button>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => handleApproveAppointment(appointment._id)}
+                                                    className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-all duration-200"
+                                                >
+                                                    Approve
+                                                </button>
+                                                <button
+                                                    onClick={() => handleRejectAppointment(appointment._id)}
+                                                    className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-all duration-200"
+                                                >
+                                                    Reject
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -240,10 +316,10 @@ const DoctorDashboard = () => {
 
                 <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100">
                     <h2 className="text-2xl font-semibold mb-6 text-[#2C3E50] pb-2 border-b border-[#A6DCEF]">All Appointments</h2>
-                    {doctorProfile?.profile?.appointments?.length > 0 ? (
+                    {appointments.length > 0 ? (
                         <div className="space-y-4">
-                            {doctorProfile.profile.appointments
-                                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                            {appointments
+                                .sort((a, b) => new Date(b.appointmentDate) - new Date(a.appointmentDate))
                                 .map((appointment) => (
                                     <div key={appointment._id} className="border rounded-lg p-6 hover:shadow-md transition-shadow duration-200">
                                         <div className="flex justify-between items-start">
@@ -254,11 +330,11 @@ const DoctorDashboard = () => {
                                                         'Patient Name Not Available'
                                                     }
                                                 </h3>
-                                                <p className="text-gray-600">Date: {new Date(appointment.date).toLocaleDateString()}</p>
-                                                <p className="text-gray-600">Time: {appointment.startTime} - {appointment.endTime}</p>
+                                                <p className="text-gray-600">Date: {new Date(appointment.appointmentDate).toLocaleDateString()}</p>
+                                                <p className="text-gray-600">Time: {new Date(appointment.appointmentTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                                                 <p className="text-gray-600">Status: 
                                                     <span className={`ml-1 px-2 py-1 rounded text-xs ${
-                                                        appointment.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                                        appointment.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                                                         appointment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                                         appointment.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                                                         'bg-gray-100 text-gray-800'
@@ -269,15 +345,26 @@ const DoctorDashboard = () => {
                                                 {appointment.reason && (
                                                     <p className="text-gray-600">Reason: {appointment.reason}</p>
                                                 )}
+                                                {appointment.approvalMessage && (
+                                                    <p className="text-gray-600">Message: {appointment.approvalMessage}</p>
+                                                )}
                                             </div>
                                             <div className="flex gap-2">
                                                 {appointment.status === 'pending' && (
-                                                    <button
-                                                        onClick={() => handleApproveAppointment(appointment._id)}
-                                                        className="bg-[#2C3E50] text-white px-4 py-2 rounded hover:opacity-90 transition-all duration-200"
-                                                    >
-                                                        Approve
-                                                    </button>
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleApproveAppointment(appointment._id)}
+                                                            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-all duration-200"
+                                                        >
+                                                            Approve
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleRejectAppointment(appointment._id)}
+                                                            className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-all duration-200"
+                                                        >
+                                                            Reject
+                                                        </button>
+                                                    </>
                                                 )}
                                             </div>
                                         </div>
