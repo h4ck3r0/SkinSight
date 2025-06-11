@@ -30,6 +30,9 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
         isInitiator: false,
         remoteUserId: null
     });
+    
+    // Track who initiated the call
+    const [callInitiator, setCallInitiator] = useState(null);
 
     // Add event to log
     const addToLog = (message, type = 'info') => {
@@ -210,7 +213,10 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             // Get the correct remote user ID from the request data
             const remoteUserId = role === 'patient' ? data.doctorId : data.patientId;
             
-            // Start video call as receiver
+            // Set the call initiator (the person who sent the request)
+            setCallInitiator(data.patientId);
+            
+            // Start video call as receiver (NOT initiator)
             setVideoCallData({
                 isActive: true,
                 isInitiator: false,
@@ -259,13 +265,16 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
         const handleVideoCallResponse = (data) => {
             console.log('Video call response received:', data);
             if (data.accepted) {
-                // Update video call data to show it's active
-                const remoteUserId = role === 'patient' ? data.doctorId : data.patientId;
-                setVideoCallData({
-                    isActive: true,
-                    isInitiator: false,
-                    remoteUserId
-                });
+                // Only update video call data if this user is the initiator (the one who sent the request)
+                if (callInitiator === user._id) {
+                    const remoteUserId = role === 'patient' ? data.doctorId : data.patientId;
+                    setVideoCallData({
+                        isActive: true,
+                        isInitiator: true,
+                        remoteUserId
+                    });
+                }
+                // The receiver's video call data should already be set by handleVideoCallRequestReceived
                 toast.success('Video call started!');
                 addToLog('Video call started', 'success');
             } else {
@@ -346,6 +355,9 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             toast.error('Invalid role for video call');
             return;
         }
+        
+        // Set this user as the call initiator
+        setCallInitiator(user._id);
         
         socket.emit('requestVideoCall', {
             doctorId,
@@ -432,6 +444,9 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             isInitiator: false,
             remoteUserId: null
         });
+        
+        // Reset call initiator
+        setCallInitiator(null);
         
         addToLog('Video call ended', 'info');
     };
