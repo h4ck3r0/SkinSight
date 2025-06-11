@@ -38,10 +38,10 @@ export default function Login() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-md w-full space-y-8">
+        <div className="min-h-screen flex items-center justify-center bg-[#A6DCEF]/10 py-12 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-md w-full space-y-8 bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-[#A6DCEF]/20">
                 <div>
-                    <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                    <h2 className="mt-6 text-center text-3xl font-extrabold text-[#2C3E50]">
                         Sign in to your account
                     </h2>
                 </div>
@@ -51,7 +51,7 @@ export default function Login() {
                             <input
                                 type="email"
                                 required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                                className="appearance-none relative block w-full px-4 py-3 border border-[#A6DCEF]/50 placeholder-[#2C3E50]/60 text-[#2C3E50] rounded-lg bg-white/20 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-[#2C3E50] focus:border-transparent transition-all duration-200 sm:text-sm"
                                 placeholder="Email address"
                                 value={email}
                                 onChange={(e) => Setemail(e.target.value)}
@@ -61,7 +61,7 @@ export default function Login() {
                             <input
                                 type="password"
                                 required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                                className="appearance-none relative block w-full px-4 py-3 mt-4 border border-[#A6DCEF]/50 placeholder-[#2C3E50]/60 text-[#2C3E50] rounded-lg bg-white/20 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-[#2C3E50] focus:border-transparent transition-all duration-200 sm:text-sm"
                                 placeholder="Password"
                                 value={password}
                                 onChange={(e) => Setpassword(e.target.value)}
@@ -78,7 +78,7 @@ export default function Login() {
                     <div>
                         <button
                             onClick={singin}
-                            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-[#2C3E50] hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2C3E50] transition-all duration-200 shadow-lg"
                         >
                             Sign in
                         </button>

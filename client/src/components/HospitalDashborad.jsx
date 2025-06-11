@@ -124,7 +124,7 @@ export default function HospitalDashborad() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-[#A6DCEF]/10">
             <div className="max-w-7xl mx-auto px-6 py-8">
                 {/* Tab Navigation */}
                 <div className="bg-white rounded-lg shadow-md p-4 mb-8">
@@ -133,8 +133,8 @@ export default function HospitalDashborad() {
                             onClick={() => setActiveTab('overview')}
                             className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
                                 activeTab === 'overview'
-                                    ? 'bg-blue-500 text-white shadow-md hover:bg-blue-600'
-                                    : 'text-gray-600 hover:bg-gray-100'
+                                    ? 'bg-[#2C3E50] text-white shadow-md hover:opacity-90'
+                                    : 'text-[#2C3E50] hover:bg-[#A6DCEF]/10'
                             }`}
                         >
                             Overview
@@ -168,7 +168,7 @@ export default function HospitalDashborad() {
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <h2 className="text-xl font-semibold mb-4 text-gray-700">Hospital Details</h2>
+                                <h2 className="text-xl font-semibold mb-4 text-[#2C3E50]">Hospital Details</h2>
                                 <div className="space-y-3">
                                     <p><span className="font-medium">Address:</span> {hospital.address}</p>
                                     <p><span className="font-medium">Phone:</span> {hospital.phone}</p>
@@ -178,7 +178,7 @@ export default function HospitalDashborad() {
                             </div>
                             
                             <div>
-                                <h2 className="text-xl font-semibold mb-4 text-gray-700">Location</h2>
+                                <h2 className="text-xl font-semibold mb-4 text-[#2C3E50]">Location</h2>
                                 <div className="space-y-3">
                                     <p><span className="font-medium">Coordinates:</span> {hospital.location.coordinates.join(", ")}</p>
                                 </div>
@@ -206,7 +206,7 @@ export default function HospitalDashborad() {
                                 const [doctorId, hospitalId] = key.split(':');
                                 const doctor = hospital.doctors.find(d => d._id === doctorId);
                                 return (
-                                    <div key={key} className="border rounded-lg p-6 bg-gradient-to-r from-gray-50 to-white shadow-sm hover:shadow-md transition-all duration-200">
+                                    <div key={key} className="border rounded-lg p-6 bg-gradient-to-r from-[#A6DCEF]/20 to-white shadow-sm hover:shadow-md transition-all duration-200">
                                         <h3 className="text-lg font-semibold mb-2">
                                             {doctor ? `${doctor.name} (${doctor.specialization})` : `Doctor ID: ${doctorId}`}
                                         </h3>
@@ -215,7 +215,7 @@ export default function HospitalDashborad() {
                                             <p>Status: {queue.status}</p>
                                             <button
                                                 onClick={() => getQueueStatus(doctorId)}
-                                                className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                                                className="bg-[#2C3E50] text-white px-3 py-1 rounded hover:opacity-90 transition-all duration-200"
                                             >
                                                 Refresh Status
                                             </button>

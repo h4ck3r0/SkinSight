@@ -208,9 +208,9 @@ const PatientDashBroad = () => {
 
     if (locationError) {
         return (
-            <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center">
+            <div className="min-h-screen bg-[#A6DCEF]/10 flex flex-col justify-center items-center">
                 <div className="bg-white rounded-lg shadow-md p-8 max-w-lg w-full">
-                    <h1 className="text-3xl font-bold mb-6 text-gray-800 text-center">Patient Dashboard</h1>
+                    <h1 className="text-3xl font-bold mb-6 text-[#2C3E50] text-center">Patient Dashboard</h1>
                     <div className="text-red-500 text-center">
                         Error: {locationError}
                     </div>
@@ -220,10 +220,10 @@ const PatientDashBroad = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-[#A6DCEF]/10">
             <div className="container mx-auto px-6 py-8">
                 <div className="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-100">
-                    <h1 className="text-3xl font-bold mb-6 text-gray-800 pb-2 border-b">Patient Dashboard</h1>
+                    <h1 className="text-3xl font-bold mb-6 text-[#2C3E50] pb-2 border-b border-[#A6DCEF]">Patient Dashboard</h1>
                     
                     {/* Tab navigation */}
                     <nav className="flex space-x-6">
@@ -231,8 +231,8 @@ const PatientDashBroad = () => {
                             onClick={() => setActiveTab('hospitals')}
                             className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
                                 activeTab === 'hospitals'
-                                    ? 'bg-blue-500 text-white shadow-md hover:bg-blue-600'
-                                    : 'text-gray-600 hover:bg-gray-100'
+                                    ? 'bg-[#2C3E50] text-white shadow-md hover:opacity-90'
+                                    : 'text-[#2C3E50] hover:bg-[#A6DCEF]/10'
                             }`}
                         >
                             Hospitals
@@ -241,8 +241,8 @@ const PatientDashBroad = () => {
                             onClick={() => setActiveTab('appointments')}
                             className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
                                 activeTab === 'appointments'
-                                    ? 'bg-blue-500 text-white shadow-md hover:bg-blue-600'
-                                    : 'text-gray-600 hover:bg-gray-100'
+                                    ? 'bg-[#2C3E50] text-white shadow-md hover:opacity-90'
+                                    : 'text-[#2C3E50] hover:bg-[#A6DCEF]/10'
                             }`}
                         >
                             Appointments
@@ -251,8 +251,8 @@ const PatientDashBroad = () => {
                             onClick={() => setActiveTab('queue')}
                             className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
                                 activeTab === 'queue'
-                                    ? 'bg-blue-500 text-white shadow-md hover:bg-blue-600'
-                                    : 'text-gray-600 hover:bg-gray-100'
+                                    ? 'bg-[#2C3E50] text-white shadow-md hover:opacity-90'
+                                    : 'text-[#2C3E50] hover:bg-[#A6DCEF]/10'
                             }`}
                         >
                             Queue Status
@@ -265,7 +265,7 @@ const PatientDashBroad = () => {
                     <div className="max-w-7xl mx-auto">
                         <div className="mb-8">
                             <input 
-                                className="w-full px-6 py-3 rounded-lg text-gray-800 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
+                                className="w-full px-6 py-3 rounded-lg text-[#2C3E50] border border-[#A6DCEF] focus:outline-none focus:ring-2 focus:ring-[#2C3E50] focus:border-transparent shadow-sm"
                                 placeholder="Search hospitals by name, address, city, state, or doctor..."
                                 value={searchedTerm}
                                 onChange={(e) => {
@@ -336,13 +336,13 @@ const PatientDashBroad = () => {
                                                             <button
                                                                 onClick={() => handleAppointment(hospital, doctor)}
                                                                 disabled={loading}
-                                                                className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 disabled:bg-gray-400 shadow-sm hover:shadow-md transition-all duration-200"
+                                                                className="bg-[#2C3E50] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 shadow-sm hover:shadow-md transition-all duration-200"
                                                             >
                                                                 {loading ? 'Booking...' : 'Book Appointment'}
                                                             </button>
                                                             <button
                                                                 onClick={() => handleJoinQueue(hospital, doctor)}
-                                                                className="bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-600 shadow-sm hover:shadow-md transition-all duration-200"
+                                                                className="bg-[#2C3E50] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 shadow-sm hover:shadow-md transition-all duration-200"
                                                             >
                                                                 Join Queue
                                                             </button>
@@ -363,7 +363,7 @@ const PatientDashBroad = () => {
                         <button 
                             onClick={getAllHospitals}
                             disabled={loading}
-                            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-400"
+                            className="bg-[#2C3E50] text-white px-6 py-3 rounded-lg hover:opacity-90 transition-all duration-200 disabled:opacity-50"
                         >
                             {loading ? 'Loading...' : (isgetAll ? "Hide All Hospitals" : "Show All Hospitals")}
                         </button>
@@ -420,9 +420,9 @@ const PatientDashBroad = () => {
                 <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100">
                     <h2 className="text-2xl font-bold text-gray-900 mb-6">Queue Status</h2>
                     {selectedDoctor && selectedHospital ? (
-                        <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-white rounded-lg border border-blue-100 shadow-sm">
-                            <h3 className="font-semibold text-blue-800 mb-2">Selected Queue:</h3>
-                            <p className="text-blue-700">
+                        <div className="mb-6 p-6 bg-gradient-to-r from-[#A6DCEF]/20 to-white rounded-lg border border-[#A6DCEF] shadow-sm">
+                            <h3 className="font-semibold text-[#2C3E50] mb-2">Selected Queue:</h3>
+                            <p className="text-[#2C3E50]">
                                 <strong>Doctor:</strong> Dr. {
                                     selectedDoctor.user ? 
                                         `${selectedDoctor.user.firstName} ${selectedDoctor.user.lastName}` : 

@@ -136,21 +136,21 @@ const DoctorDashboard = () => {
     }) || [];
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-[#A6DCEF]/10">
             <div className="container mx-auto px-6 py-8">
                 <div className="flex justify-between items-center mb-8 bg-white rounded-lg shadow-md p-6">
-                    <h1 className="text-3xl font-bold text-gray-800">Doctor Dashboard</h1>
+                    <h1 className="text-3xl font-bold text-[#2C3E50]">Doctor Dashboard</h1>
                     
                     <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-full">
-                        <div className={`w-3 h-3 rounded-full ${isSocketConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-                        <span className={`text-sm font-medium ${isSocketConnected ? 'text-green-600' : 'text-red-600'}`}>
+                        <div className={`w-3 h-3 rounded-full ${isSocketConnected ? 'bg-[#2C3E50] animate-pulse' : 'bg-red-500'}`}></div>
+                        <span className={`text-sm font-medium ${isSocketConnected ? 'text-[#2C3E50]' : 'text-red-600'}`}>
                             {isSocketConnected ? 'Connected' : 'Disconnected'}
                         </span>
                     </div>
                 </div>
 
                 <div className="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-100">
-                    <h2 className="text-2xl font-semibold mb-6 text-gray-800 pb-2 border-b">Doctor Profile</h2>
+                    <h2 className="text-2xl font-semibold mb-6 text-[#2C3E50] pb-2 border-b border-[#A6DCEF]">Doctor Profile</h2>
                     {doctorProfile?.profile ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
@@ -181,11 +181,11 @@ const DoctorDashboard = () => {
                 </div>
 
                 <div className="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-100">
-                    <h2 className="text-2xl font-semibold mb-6 text-gray-800 pb-2 border-b">Today's Appointments</h2>
+                    <h2 className="text-2xl font-semibold mb-6 text-[#2C3E50] pb-2 border-b border-[#A6DCEF]">Today's Appointments</h2>
                     {todaysAppointments.length > 0 ? (
                         <div className="space-y-4">
                             {todaysAppointments.map((appointment) => (
-                                <div key={appointment._id} className="border rounded-lg p-6 bg-gradient-to-r from-blue-50 to-white shadow-sm hover:shadow-md transition-shadow duration-200">
+                                <div key={appointment._id} className="border rounded-lg p-6 bg-gradient-to-r from-[#A6DCEF]/20 to-white shadow-sm hover:shadow-md transition-shadow duration-200">
                                     <div className="flex justify-between items-start">
                                         <div>
                                             <h3 className="font-semibold">
@@ -201,7 +201,7 @@ const DoctorDashboard = () => {
                                         {appointment.status === 'pending' && (
                                             <button
                                                 onClick={() => handleApproveAppointment(appointment._id)}
-                                                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors"
+                                                className="bg-[#2C3E50] text-white px-4 py-2 rounded hover:opacity-90 transition-all duration-200"
                                             >
                                                 Approve
                                             </button>
@@ -217,10 +217,10 @@ const DoctorDashboard = () => {
 
                 <div className="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-100">
                     <div className="flex justify-between items-center mb-6 pb-2 border-b">
-                        <h2 className="text-2xl font-semibold text-gray-800">Queue Management</h2>
-                        <div className="px-4 py-2 bg-gray-50 rounded-full">
-                            <span className="text-sm font-medium text-gray-600">
-                                Hospital ID: <span className="text-blue-600">{user.hospitalId}</span>
+                        <h2 className="text-2xl font-semibold text-[#2C3E50]">Queue Management</h2>
+                        <div className="px-4 py-2 bg-[#A6DCEF]/10 rounded-full">
+                            <span className="text-sm font-medium text-[#2C3E50]">
+                                Hospital ID: <span className="text-[#2C3E50] font-bold">{user.hospitalId}</span>
                             </span>
                         </div>
                     </div>
@@ -239,7 +239,7 @@ const DoctorDashboard = () => {
                 </div>
 
                 <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100">
-                    <h2 className="text-2xl font-semibold mb-6 text-gray-800 pb-2 border-b">All Appointments</h2>
+                    <h2 className="text-2xl font-semibold mb-6 text-[#2C3E50] pb-2 border-b border-[#A6DCEF]">All Appointments</h2>
                     {doctorProfile?.profile?.appointments?.length > 0 ? (
                         <div className="space-y-4">
                             {doctorProfile.profile.appointments
@@ -274,7 +274,7 @@ const DoctorDashboard = () => {
                                                 {appointment.status === 'pending' && (
                                                     <button
                                                         onClick={() => handleApproveAppointment(appointment._id)}
-                                                        className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors"
+                                                        className="bg-[#2C3E50] text-white px-4 py-2 rounded hover:opacity-90 transition-all duration-200"
                                                     >
                                                         Approve
                                                     </button>
