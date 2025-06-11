@@ -108,9 +108,11 @@ const PatientDashBroad = () => {
             setError(null);
             
             const response = await axios.get(`${API_URL}/hospital`);
+            console.log('GetAllHospitals response:', response.data);
 
             if (response.data && response.data.hospitals) {
                 const hospitalList = response.data.hospitals;
+                console.log('Setting allhospitals:', hospitalList);
                 setAllHospitals(hospitalList);
                 SetgetAll(!isgetAll);
                 
@@ -256,9 +258,9 @@ const PatientDashBroad = () => {
             (hospital.city && hospital.city.toLowerCase().includes(term)) ||
             (hospital.state && hospital.state.toLowerCase().includes(term)) ||
             (hospital.doctors && hospital.doctors.some(doctor => {
-                const doctorName = doctor.user ? 
-                    `${doctor.user.firstName} ${doctor.user.lastName}` : 
-                    (doctor.firstName ? `${doctor.firstName} ${doctor.lastName}` : doctor.name || '');
+                const firstName = doctor.user?.firstName || doctor.firstName || '';
+                const lastName = doctor.user?.lastName || doctor.lastName || '';
+                const doctorName = firstName + (lastName ? ` ${lastName}` : '');
                 return doctorName.toLowerCase().includes(term) || 
                        (doctor.specialization && doctor.specialization.toLowerCase().includes(term));
             }))
@@ -347,79 +349,93 @@ const PatientDashBroad = () => {
                             </div>
                         )}
 
-                        {!loading && !error && hospitals.length === 0 && (
+                        {!loading && !error && (isgetAll ? allhospitals.length === 0 : hospitals.length === 0) && (
                             <div className="text-center py-4">
-                                No hospitals found nearby
+                                {isgetAll ? 'No hospitals found' : 'No hospitals found nearby'}
                             </div>
                         )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {(showSearchResults ? filterHospitals : hospitals).map((hospital) => (
-                            <div key={hospital._id} className="bg-white rounded-lg shadow-md p-6 border border-gray-100 hover:shadow-lg transition-shadow duration-200">
-                                <h3 className="text-xl font-semibold mb-2 text-gray-800">{hospital.name}</h3>
-                                <p className="text-gray-600 mb-2">{hospital.address}</p>
-                                <p className="text-gray-600 mb-4">Phone: {hospital.phone}</p>
-                                
-                                {hospital.doctors && hospital.doctors.length > 0 ? (
-                                    <div className="mt-4">
-                                        <h4 className="font-medium mb-2 text-gray-800">Available Doctors:</h4>
-                                        <div className="space-y-3">
-                                            {hospital.doctors.map((doctor, index) => {
-                                                // Handle different doctor data structures
-                                                const doctorName = doctor.user ? 
-                                                    `${doctor.user.firstName} ${doctor.user.lastName}` : 
-                                                    (doctor.firstName ? `${doctor.firstName} ${doctor.lastName}` : doctor.name || 'Unknown Doctor');
-                                                
-                                                return (
-                                                    <div key={doctor._id || index} className="border border-gray-200 rounded-lg p-4 bg-gradient-to-r from-gray-50 to-white hover:shadow-md transition-all duration-200">
-                                                        <p className="font-medium text-gray-800">
-                                                            Dr. {doctorName}
-                                                        </p>
-                                                        <p className="text-sm text-gray-600">
-                                                            Specialization: {doctor.specialization || 'General'}
-                                                        </p>
-                                                        <p className="text-sm text-gray-600">
-                                                            Experience: {doctor.experience || 'N/A'} years
-                                                        </p>
-                                                        <p className="text-sm text-gray-600">
-                                                            Consultation Fee: ₹{doctor.consultationFee || 'N/A'}
-                                                        </p>
-                                                        {doctor.languages && (
-                                                            <p className="text-sm text-gray-600">
-                                                                Languages: {Array.isArray(doctor.languages) ? doctor.languages.join(', ') : doctor.languages}
+                        <>
+                        {(() => {
+                            const hospitalsToShow = showSearchResults ? filterHospitals : (isgetAll ? allhospitals : hospitals);
+                            console.log('Hospitals to show:', {
+                                showSearchResults,
+                                isgetAll,
+                                hospitalsCount: hospitals.length,
+                                allhospitalsCount: allhospitals.length,
+                                filterHospitalsCount: filterHospitals.length,
+                                hospitalsToShowCount: hospitalsToShow.length,
+                                hospitalsToShow
+                            });
+                            return hospitalsToShow.map((hospital) => (
+                                <div key={hospital._id} className="bg-white rounded-lg shadow-md p-6 border border-gray-100 hover:shadow-lg transition-shadow duration-200">
+                                    <h3 className="text-xl font-semibold mb-2 text-gray-800">{hospital.name}</h3>
+                                    <p className="text-gray-600 mb-2">{hospital.address}</p>
+                                    <p className="text-gray-600 mb-4">Phone: {hospital.phone}</p>
+                                    
+                                    {hospital.doctors && hospital.doctors.length > 0 ? (
+                                        <div className="mt-4">
+                                            <h4 className="font-medium mb-2 text-gray-800">Available Doctors:</h4>
+                                            <div className="space-y-3">
+                                                {hospital.doctors.map((doctor, index) => {
+                                                    // Handle different doctor data structures
+                                                    const firstName = doctor.user?.firstName || doctor.firstName || '';
+                                                    const lastName = doctor.user?.lastName || doctor.lastName || '';
+                                                    const doctorName = firstName + (lastName ? ` ${lastName}` : '');
+                                                    
+                                                    return (
+                                                        <div key={doctor._id || index} className="border border-gray-200 rounded-lg p-4 bg-gradient-to-r from-gray-50 to-white hover:shadow-md transition-all duration-200">
+                                                            <p className="font-medium text-gray-800">
+                                                                Dr. {doctorName || 'Unknown Doctor'}
                                                             </p>
-                                                        )}
-                                                        
-                                                        <div className="flex gap-2 mt-3">
-                                                            {doctor._id && (
-                                                                <button
-                                                                    onClick={() => handleBookAppointment(hospital, doctor)}
-                                                                    disabled={loading}
-                                                                    className="bg-[#2C3E50] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 shadow-sm hover:shadow-md transition-all duration-200"
-                                                                >
-                                                                    {loading ? 'Booking...' : 'Book Appointment'}
-                                                                </button>
+                                                            <p className="text-sm text-gray-600">
+                                                                Specialization: {doctor.specialization || 'General'}
+                                                            </p>
+                                                            <p className="text-sm text-gray-600">
+                                                                Experience: {doctor.experience || 'N/A'} years
+                                                            </p>
+                                                            <p className="text-sm text-gray-600">
+                                                                Consultation Fee: ₹{doctor.consultationFee || 'N/A'}
+                                                            </p>
+                                                            {doctor.languages && (
+                                                                <p className="text-sm text-gray-600">
+                                                                    Languages: {Array.isArray(doctor.languages) ? doctor.languages.join(', ') : doctor.languages}
+                                                                </p>
                                                             )}
-                                                            {doctor._id && (
-                                                                <button
-                                                                    onClick={() => handleJoinQueue(hospital, doctor)}
-                                                                    className="bg-[#2C3E50] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 shadow-sm hover:shadow-md transition-all duration-200"
-                                                                >
-                                                                    Join Queue
-                                                                </button>
-                                                            )}
+                                                            
+                                                            <div className="flex gap-2 mt-3">
+                                                                {doctor._id && (
+                                                                    <button
+                                                                        onClick={() => handleBookAppointment(hospital, doctor)}
+                                                                        disabled={loading}
+                                                                        className="bg-[#2C3E50] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 shadow-sm hover:shadow-md transition-all duration-200"
+                                                                    >
+                                                                        {loading ? 'Booking...' : 'Book Appointment'}
+                                                                    </button>
+                                                                )}
+                                                                {doctor._id && (
+                                                                    <button
+                                                                        onClick={() => handleJoinQueue(hospital, doctor)}
+                                                                        className="bg-[#2C3E50] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 shadow-sm hover:shadow-md transition-all duration-200"
+                                                                    >
+                                                                        Join Queue
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                );
-                                            })}
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
-                                    </div>
-                                ) : (
-                                    <p className="text-gray-500 italic">No doctors available at this hospital</p>
-                                )}
-                            </div>
-                        ))}
+                                    ) : (
+                                        <p className="text-gray-500 italic">No doctors available at this hospital</p>
+                                    )}
+                                </div>
+                            ));
+                        })()}
+                        </>
                     </div>
 
                     <div className="mt-8 text-center">
@@ -452,9 +468,12 @@ const PatientDashBroad = () => {
                                         <div className="flex justify-between items-start">
                                             <div>
                                                 <h3 className="font-semibold text-lg text-gray-800">
-                                                    Dr. {appointment.doctor ? 
-                                                        `${appointment.doctor.firstName || appointment.doctor.user?.firstName || ''} ${appointment.doctor.lastName || appointment.doctor.user?.lastName || ''}` : 
-                                                        'Doctor Name Not Available'}
+                                                    Dr. {(() => {
+                                                        const firstName = appointment.doctor?.firstName || appointment.doctor?.user?.firstName || '';
+                                                        const lastName = appointment.doctor?.lastName || appointment.doctor?.user?.lastName || '';
+                                                        const doctorName = firstName + (lastName ? ` ${lastName}` : '');
+                                                        return doctorName || 'Doctor Name Not Available';
+                                                    })()}
                                                 </h3>
                                                 <p className="text-gray-600">Hospital: {appointment.hospital?.name || 'Not specified'}</p>
                                                 <p className="text-gray-600">Date: {new Date(appointment.appointmentDate).toLocaleDateString()}</p>
@@ -486,11 +505,12 @@ const PatientDashBroad = () => {
                         <div className="mb-6 p-6 bg-gradient-to-r from-[#A6DCEF]/20 to-white rounded-lg border border-[#A6DCEF] shadow-sm">
                             <h3 className="font-semibold text-[#2C3E50] mb-2">Selected Queue:</h3>
                             <p className="text-[#2C3E50]">
-                                <strong>Doctor:</strong> Dr. {
-                                    selectedDoctor.user ? 
-                                        `${selectedDoctor.user.firstName} ${selectedDoctor.user.lastName}` : 
-                                        (selectedDoctor.firstName ? `${selectedDoctor.firstName} ${selectedDoctor.lastName}` : selectedDoctor.name || 'Unknown')
-                                } ({selectedDoctor.specialization})
+                                <strong>Doctor:</strong> Dr. {(() => {
+                                    const firstName = selectedDoctor.user?.firstName || selectedDoctor.firstName || '';
+                                    const lastName = selectedDoctor.user?.lastName || selectedDoctor.lastName || '';
+                                    const doctorName = firstName + (lastName ? ` ${lastName}` : '');
+                                    return doctorName || 'Unknown';
+                                })()} ({selectedDoctor.specialization})
                             </p>
                             <p className="text-blue-700">
                                 <strong>Hospital:</strong> {selectedHospital.name}
@@ -524,12 +544,12 @@ const PatientDashBroad = () => {
                                     >
                                         <option value="">Select Doctor</option>
                                         {selectedHospital.doctors.map((doctor) => {
-                                            const doctorName = doctor.user ? 
-                                                `${doctor.user.firstName} ${doctor.user.lastName}` : 
-                                                (doctor.firstName ? `${doctor.firstName} ${doctor.lastName}` : doctor.name || 'Unknown Doctor');
+                                            const firstName = doctor.user?.firstName || doctor.firstName || '';
+                                            const lastName = doctor.user?.lastName || doctor.lastName || '';
+                                            const doctorName = firstName + (lastName ? ` ${lastName}` : '');
                                             return (
                                                 <option key={doctor._id} value={doctor._id}>
-                                                    Dr. {doctorName} - {doctor.specialization}
+                                                    Dr. {doctorName || 'Unknown Doctor'} - {doctor.specialization}
                                                 </option>
                                             );
                                         })}
@@ -555,11 +575,12 @@ const PatientDashBroad = () => {
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-lg p-6 max-w-md w-full">
                         <h3 className="text-xl font-semibold mb-4 text-[#2C3E50]">
-                            Book Appointment with Dr. {
-                                selectedDoctor.user ? 
-                                    `${selectedDoctor.user.firstName} ${selectedDoctor.user.lastName}` : 
-                                    (selectedDoctor.firstName ? `${selectedDoctor.firstName} ${selectedDoctor.lastName}` : selectedDoctor.name || 'Unknown')
-                            }
+                            Book Appointment with Dr. {(() => {
+                                const firstName = selectedDoctor.user?.firstName || selectedDoctor.firstName || '';
+                                const lastName = selectedDoctor.user?.lastName || selectedDoctor.lastName || '';
+                                const doctorName = firstName + (lastName ? ` ${lastName}` : '');
+                                return doctorName || 'Unknown';
+                            })()}
                         </h3>
                         <form onSubmit={handleAppointmentSubmit} className="space-y-4">
                             <div>
