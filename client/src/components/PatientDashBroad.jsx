@@ -542,7 +542,7 @@ const PatientDashBroad = () => {
 
                     {selectedDoctor && selectedHospital && (
                         <QueueSystem
-                            doctorId={selectedDoctor.user}
+                            doctorId={selectedDoctor.user?._id || selectedDoctor.user}
                             hospitalId={selectedHospital._id}
                             role="patient"
                         />

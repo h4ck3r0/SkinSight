@@ -47,7 +47,14 @@ export async function createHospital(req, res) {
 //patient-NP
 export const getHospitals = async (req, res) => {
     try {
-        const hospitals = await HospitalModel.find({});
+        const hospitals = await HospitalModel.find({}).populate({
+            path: 'doctors',
+            select: 'specialization experience consultationFee languages bio availability user',
+            populate: {
+                path: 'user',
+                select: 'firstName lastName email'
+            }
+        });
         res.status(200).json({
             message: "Hospitals retrieved successfully",
             hospitals
@@ -67,7 +74,14 @@ export const getHospital = async (req, res) => {
             return getHospitals(req, res);
         }
 
-        const hospital = await HospitalModel.findById(id);
+        const hospital = await HospitalModel.findById(id).populate({
+            path: 'doctors',
+            select: 'specialization experience consultationFee languages bio availability user',
+            populate: {
+                path: 'user',
+                select: 'firstName lastName email'
+            }
+        });
         if (!hospital) {
             return res.status(404).json({ message: "Hospital not found" });
         }
@@ -139,7 +153,11 @@ export const GetnearBy = async (req, res) => {
             }
         }).populate({
             path: 'doctors',
-            select: 'firstName lastName specialization experience consultationFee languages bio availability user'
+            select: 'specialization experience consultationFee languages bio availability user',
+            populate: {
+                path: 'user',
+                select: 'firstName lastName email'
+            }
         });
 
         console.log("Found hospitals:", hospitals.length);
@@ -149,7 +167,11 @@ export const GetnearBy = async (req, res) => {
             console.log("No nearby hospitals found, returning all hospitals");
             const allHospitals = await HospitalModel.find().populate({
                 path: 'doctors',
-                select: 'firstName lastName specialization experience consultationFee languages bio availability user'
+                select: 'specialization experience consultationFee languages bio availability user',
+                populate: {
+                    path: 'user',
+                    select: 'firstName lastName email'
+                }
             });
 
             return res.status(200).json({
