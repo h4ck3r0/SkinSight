@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import Peer from 'simple-peer';
 import { toast } from 'react-hot-toast';
+import { useSimplePeer } from '../hooks/useSimplePeer';
 
 const VideoCall = ({ 
     isActive, 
@@ -10,6 +10,7 @@ const VideoCall = ({
     remoteUserId, 
     isInitiator = false 
 }) => {
+    const { Peer, loading, error } = useSimplePeer();
     const [localStream, setLocalStream] = useState(null);
     const [remoteStream, setRemoteStream] = useState(null);
     const [isConnecting, setIsConnecting] = useState(false);
@@ -21,7 +22,14 @@ const VideoCall = ({
     const localStreamRef = useRef();
 
     useEffect(() => {
-        if (isActive && !localStream) {
+        if (error) {
+            toast.error('Failed to load video call library');
+            console.error('Simple-peer error:', error);
+        }
+    }, [error]);
+
+    useEffect(() => {
+        if (isActive && !localStream && !loading && Peer) {
             startLocalStream();
         }
         
@@ -33,7 +41,7 @@ const VideoCall = ({
                 peerRef.current.destroy();
             }
         };
-    }, [isActive]);
+    }, [isActive, loading, Peer]);
 
     const startLocalStream = async () => {
         try {
@@ -59,7 +67,7 @@ const VideoCall = ({
     };
 
     const createPeer = (initiator) => {
-        if (!localStream) return;
+        if (!localStream || !Peer) return;
 
         const peer = new Peer({
             initiator,
@@ -172,6 +180,37 @@ const VideoCall = ({
     }, [localUserId]);
 
     if (!isActive) return null;
+
+    if (loading) {
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6">
+                    <div className="flex items-center gap-3">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                        <span>Loading video call...</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6">
+                    <div className="text-red-600">
+                        <p>Failed to load video call library</p>
+                        <button 
+                            onClick={onEndCall}
+                            className="mt-2 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
