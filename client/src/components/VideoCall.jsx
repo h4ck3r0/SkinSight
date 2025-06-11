@@ -261,18 +261,46 @@ const VideoCall = ({
 
     // Expose handleSignal function to parent component
     useEffect(() => {
+        const handler = (signal) => {
+            // Check if video call is still active before handling signal
+            if (!isActive) {
+                console.log('Video call not active, ignoring signal');
+                return;
+            }
+            
+            // Check if peer exists and is not destroyed
+            if (!peerRef.current) {
+                console.log('No peer available, ignoring signal');
+                return;
+            }
+            
+            try {
+                console.log('Handling signal in VideoCall');
+                handleSignal(signal);
+            } catch (error) {
+                console.error('Error handling signal:', error);
+                if (error.message.includes('destroyed')) {
+                    console.log('Peer destroyed, removing handler');
+                    if (window.videoCallHandlers && window.videoCallHandlers[localUserId]) {
+                        delete window.videoCallHandlers[localUserId];
+                    }
+                }
+            }
+        };
+
         if (window.videoCallHandlers) {
-            window.videoCallHandlers[localUserId] = handleSignal;
+            window.videoCallHandlers[localUserId] = handler;
         } else {
-            window.videoCallHandlers = { [localUserId]: handleSignal };
+            window.videoCallHandlers = { [localUserId]: handler };
         }
 
         return () => {
-            if (window.videoCallHandlers) {
+            console.log('Cleaning up video call handler for user:', localUserId);
+            if (window.videoCallHandlers && window.videoCallHandlers[localUserId]) {
                 delete window.videoCallHandlers[localUserId];
             }
         };
-    }, [localUserId]);
+    }, [localUserId, isActive]);
 
     if (!isActive) return null;
 

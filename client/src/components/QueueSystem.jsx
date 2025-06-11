@@ -33,6 +33,9 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
     
     // Track who initiated the call
     const [callInitiator, setCallInitiator] = useState(null);
+    
+    // Add debounce for video call state changes
+    const [isVideoCallStateChanging, setIsVideoCallStateChanging] = useState(false);
 
     // Add event to log
     const addToLog = (message, type = 'info') => {
@@ -207,8 +210,16 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
 
         const handleVideoCallRequestReceived = (data) => {
             console.log('Video call request received:', data);
+            
+            if (isVideoCallStateChanging) {
+                console.log('Video call state is changing, ignoring request');
+                return;
+            }
+            
             toast.success('Video call request received - starting call...');
             addToLog('Video call request received', 'info');
+            
+            setIsVideoCallStateChanging(true);
             
             // Get the correct remote user ID from the request data
             const remoteUserId = role === 'patient' ? data.doctorId : data.patientId;
@@ -231,6 +242,11 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                 accepted: true
             });
             
+            // Reset the debounce after a short delay
+            setTimeout(() => {
+                setIsVideoCallStateChanging(false);
+            }, 1000);
+            
             addToLog('Video call accepted and started', 'success');
         };
 
@@ -241,7 +257,15 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             
             if (window.videoCallHandlers && window.videoCallHandlers[user._id]) {
                 console.log('Calling signal handler for user:', user._id);
-                window.videoCallHandlers[user._id](data.signal);
+                try {
+                    window.videoCallHandlers[user._id](data.signal);
+                } catch (error) {
+                    console.error('Error in signal handler:', error);
+                    if (error.message.includes('destroyed')) {
+                        console.log('Peer was destroyed, removing handler');
+                        delete window.videoCallHandlers[user._id];
+                    }
+                }
             } else {
                 console.log('No signal handler found for user:', user._id);
             }
@@ -341,6 +365,11 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             return;
         }
         
+        if (isVideoCallStateChanging) {
+            console.log('Video call state is changing, ignoring request');
+            return;
+        }
+        
         // Determine the correct remote user ID based on role
         let remoteUserId;
         if (role === 'patient') {
@@ -356,6 +385,8 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             return;
         }
         
+        setIsVideoCallStateChanging(true);
+        
         // Set this user as the call initiator
         setCallInitiator(user._id);
         
@@ -370,6 +401,11 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             isInitiator: true,
             remoteUserId
         });
+        
+        // Reset the debounce after a short delay
+        setTimeout(() => {
+            setIsVideoCallStateChanging(false);
+        }, 1000);
         
         addToLog('Video call request sent', 'info');
     };
