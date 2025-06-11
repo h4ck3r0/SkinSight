@@ -25,9 +25,6 @@ import {
 const Home = () => {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isSignUpOpen, setIsSignUpOpen] = useState(false);
-  const [isSignInOpen, setIsSignInOpen] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
 
   const slides = [
@@ -70,16 +67,6 @@ const Home = () => {
 
     return () => clearInterval(timer);
   }, []);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    userType: 'patient'
-  });
-
-  const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
 
   const features = [
     {
@@ -135,126 +122,6 @@ const Home = () => {
     }
   ];
 
-  const AuthModal = ({ isOpen, onClose, type }) => {
-    if (!isOpen) return null;
-
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center">
-        <div className="fixed inset-0 bg-black/50" onClick={onClose}></div>
-        <div className="relative bg-white rounded-3xl border-2 border-[#A6DCEF] p-8 w-full max-w-md mx-4 shadow-2xl">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 hover:bg-[#A6DCEF]/10 rounded-full transition-colors"
-          >
-            <X className="w-5 h-5 text-[#2C3E50]" />
-          </button>
-
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-[#2C3E50] rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <SmilePlus className="w-10 h-10 text-[#A6DCEF]" />
-            </div>
-            <h2 className="text-3xl font-bold text-[#2C3E50] mb-4">
-              {type === 'signup' ? 'Create Account' : 'Welcome Back'}
-            </h2>
-          </div>
-
-          <form className="space-y-4">
-            {type === 'signup' && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-[#2C3E50] mb-2">Full Name</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[#2C3E50]/50" />
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-[#A6DCEF] rounded-xl text-[#2C3E50] placeholder-[#2C3E50]/50 focus:outline-none focus:border-[#2C3E50] transition-all"
-                      placeholder="Enter your name"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[#2C3E50] mb-2">I am a</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['patient', 'doctor', 'hospital'].map((userType) => (
-                      <button
-                        key={userType}
-                        type="button"
-                        onClick={() => setFormData({...formData, userType})}
-                        className={`py-3 px-4 rounded-xl text-sm font-medium transition-all ${
-                          formData.userType === userType
-                            ? 'bg-[#2C3E50] text-white'
-                            : 'border-2 border-[#A6DCEF] text-[#2C3E50] hover:border-[#2C3E50]'
-                        }`}
-                      >
-                        {userType.charAt(0).toUpperCase() + userType.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-[#2C3E50] mb-2">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[#2C3E50]/50" />
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-[#A6DCEF] rounded-xl text-[#2C3E50] placeholder-[#2C3E50]/50 focus:outline-none focus:border-[#2C3E50] transition-all"
-                  placeholder="Enter your email"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[#2C3E50] mb-2">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[#2C3E50]/50" />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="w-full pl-12 pr-12 py-3.5 bg-white border-2 border-[#A6DCEF] rounded-xl text-[#2C3E50] placeholder-[#2C3E50]/50 focus:outline-none focus:border-[#2C3E50] transition-all"
-                  placeholder="Enter your password"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-4 bg-[#2C3E50] text-white font-semibold rounded-xl hover:bg-[#A6DCEF] hover:text-[#2C3E50] transition-all transform hover:scale-105 shadow-lg"
-            >
-              {type === 'signup' ? 'Create Account' : 'Sign In'}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-[#2C3E50]">
-              {type === 'signup' ? 'Already have an account?' : "Don't have an account?"}
-              <button
-                onClick={() => {
-                  onClose();
-                  type === 'signup' ? setIsSignInOpen(true) : setIsSignUpOpen(true);
-                }}
-                className="text-[#A6DCEF] hover:text-[#2C3E50] ml-2 font-medium transition-colors"
-              >
-                {type === 'signup' ? 'Sign In' : 'Sign Up'}
-              </button>
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
@@ -276,13 +143,13 @@ const Home = () => {
               <a href="#services" className="text-[#2C3E50] hover:text-[#A6DCEF] transition-colors">Services</a>
               <a href="#testimonials" className="text-[#2C3E50] hover:text-[#A6DCEF] transition-colors">Testimonials</a>
               <button
-                onClick={() => setIsSignInOpen(true)}
+                onClick={() => navigate('/login')}
                 className="px-6 py-2 text-[#2C3E50] hover:text-[#A6DCEF] transition-colors font-medium"
               >
                 Sign In
               </button>
               <button
-                onClick={() => setIsSignUpOpen(true)}
+                onClick={() => navigate('/signup')}
                 className="px-6 py-2 bg-[#2C3E50] text-white rounded-xl hover:bg-[#A6DCEF] hover:text-[#2C3E50] transition-all"
               >
                 Get Started
@@ -307,13 +174,13 @@ const Home = () => {
                 <a href="#testimonials" className="text-[#2C3E50] hover:text-[#A6DCEF] transition-colors px-2">Testimonials</a>
                 <div className="pt-4 space-y-2">
                   <button
-                    onClick={() => { setIsSignInOpen(true); setIsMenuOpen(false); }}
+                    onClick={() => navigate('/login')}
                     className="block w-full text-left px-2 py-2 text-[#2C3E50] hover:text-[#A6DCEF] transition-colors"
                   >
                     Sign In
                   </button>
                   <button
-                    onClick={() => { setIsSignUpOpen(true); setIsMenuOpen(false); }}
+                    onClick={() => navigate('/signup')}
                     className="block w-full px-2 py-2 bg-[#2C3E50] text-white rounded-lg hover:bg-[#A6DCEF] hover:text-[#2C3E50] transition-colors"
                   >
                     Get Started
@@ -340,7 +207,7 @@ const Home = () => {
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <button
-                  onClick={() => setIsSignUpOpen(true)}
+                  onClick={() => navigate('/signup')}
                   className="inline-flex items-center justify-center px-8 py-4 bg-[#2C3E50] text-white rounded-xl hover:bg-[#A6DCEF] hover:text-[#2C3E50] transition-all group"
                 >
                   Get Started
@@ -463,7 +330,7 @@ const Home = () => {
             Join thousands of satisfied users who have made SkinSight their preferred healthcare platform
           </p>
           <button
-            onClick={() => setIsSignUpOpen(true)}
+            onClick={() => navigate('/signup')}
             className="inline-flex items-center justify-center px-8 py-4 bg-[#2C3E50] text-white rounded-xl hover:bg-[#A6DCEF] hover:text-[#2C3E50] transition-all group text-lg font-medium"
           >
             Get Started Now
@@ -516,10 +383,6 @@ const Home = () => {
           </p>
         </div>
       </footer>
-
-      {/* Auth Modals */}
-      <AuthModal isOpen={isSignUpOpen} onClose={() => setIsSignUpOpen(false)} type="signup" />
-      <AuthModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} type="signin" />
     </div>
   );
 };

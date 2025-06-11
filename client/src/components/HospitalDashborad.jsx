@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import HospitalDoctors from "./HospitalDoctors";
+import QueueSystem from "./QueueSystem";
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { toast } from 'react-hot-toast';
@@ -15,6 +16,7 @@ export default function HospitalDashborad() {
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('overview');
     const [queues, setQueues] = useState({});
+    const [selectedDoctor, setSelectedDoctor] = useState(null);
 
     useEffect(() => {
         if (!user) {
@@ -143,8 +145,8 @@ export default function HospitalDashborad() {
                             onClick={() => setActiveTab('doctors')}
                             className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
                                 activeTab === 'doctors'
-                                    ? 'bg-blue-500 text-white shadow-md hover:bg-blue-600'
-                                    : 'text-gray-600 hover:bg-gray-100'
+                                    ? 'bg-[#2C3E50] text-white shadow-md hover:opacity-90'
+                                    : 'text-[#2C3E50] hover:bg-[#A6DCEF]/10'
                             }`}
                         >
                             Doctors
@@ -153,8 +155,8 @@ export default function HospitalDashborad() {
                             onClick={() => setActiveTab('queues')}
                             className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
                                 activeTab === 'queues'
-                                    ? 'bg-blue-500 text-white shadow-md hover:bg-blue-600'
-                                    : 'text-gray-600 hover:bg-gray-100'
+                                    ? 'bg-[#2C3E50] text-white shadow-md hover:opacity-90'
+                                    : 'text-[#2C3E50] hover:bg-[#A6DCEF]/10'
                             }`}
                         >
                             Queue Management
@@ -201,33 +203,81 @@ export default function HospitalDashborad() {
                     <div className="bg-white rounded-lg shadow-md p-8 border border-gray-100">
                         <h2 className="text-2xl font-bold mb-6 text-gray-800 pb-2 border-b">Queue Management</h2>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {Object.entries(queues).map(([key, queue]) => {
-                                const [doctorId, hospitalId] = key.split(':');
-                                const doctor = hospital.doctors.find(d => d._id === doctorId);
-                                return (
-                                    <div key={key} className="border rounded-lg p-6 bg-gradient-to-r from-[#A6DCEF]/20 to-white shadow-sm hover:shadow-md transition-all duration-200">
-                                        <h3 className="text-lg font-semibold mb-2">
-                                            {doctor ? `${doctor.name} (${doctor.specialization})` : `Doctor ID: ${doctorId}`}
-                                        </h3>
-                                        <div className="space-y-2">
-                                            <p>Total Patients: {queue.patients.length}</p>
-                                            <p>Status: {queue.status}</p>
-                                            <button
-                                                onClick={() => getQueueStatus(doctorId)}
-                                                className="bg-[#2C3E50] text-white px-3 py-1 rounded hover:opacity-90 transition-all duration-200"
-                                            >
-                                                Refresh Status
-                                            </button>
+                        {hospital.doctors && hospital.doctors.length > 0 ? (
+                            <div className="space-y-8">
+                                {hospital.doctors.map((doctor) => {
+                                    // Handle doctor name - the user field is just an ID, not populated object
+                                    const doctorName = (() => {
+                                        // Since user field is just an ID, we'll use a fallback
+                                        return `Doctor ID: ${doctor.user || doctor._id}`;
+                                    })();
+                                    
+                                    // Get availability information
+                                    const availability = doctor.availability || [];
+                                    const appointments = doctor.appointments || [];
+                                    
+                                    return (
+                                        <div key={doctor._id} className="border rounded-lg p-6 bg-gradient-to-r from-[#A6DCEF]/10 to-white shadow-sm hover:shadow-md transition-all duration-200">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div>
+                                                    <h3 className="text-xl font-semibold text-[#2C3E50]">
+                                                        {doctorName}
+                                                    </h3>
+                                                    <p className="text-gray-600">Specialization: {doctor.specialization || 'General'}</p>
+                                                    <p className="text-gray-600">Experience: {doctor.experience || 'N/A'} years</p>
+                                                    <p className="text-gray-600">Consultation Fee: ₹{doctor.consultationFee || 'N/A'}</p>
+                                                </div>
+                                                <div className="px-4 py-2 bg-[#A6DCEF]/20 rounded-full">
+                                                    <span className="text-sm font-medium text-[#2C3E50]">
+                                                        Profile ID: {doctor._id}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Availability Information */}
+                                            {availability.length > 0 && (
+                                                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                                                    <h4 className="font-semibold text-[#2C3E50] mb-2">Weekly Availability:</h4>
+                                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                                                        {availability.map((slot, index) => (
+                                                            <div key={index} className="text-sm">
+                                                                <span className="font-medium">{slot.day}:</span>
+                                                                <span className={`ml-1 ${slot.isAvailable ? 'text-green-600' : 'text-red-600'}`}>
+                                                                    {slot.isAvailable ? `${slot.startTime}-${slot.endTime}` : 'Not Available'}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Appointments Information */}
+                                            {appointments.length > 0 && (
+                                                <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                                                    <h4 className="font-semibold text-[#2C3E50] mb-2">Scheduled Appointments:</h4>
+                                                    <div className="text-sm text-gray-600">
+                                                        {appointments.length} appointment(s) scheduled
+                                                    </div>
+                                                </div>
+                                            )}
+                                            
+                                            <QueueSystem
+                                                doctorId={(() => {
+                                                    // Extract user ID properly - handle both string and object cases
+                                                    const userId = typeof doctor.user === 'object' ? doctor.user._id : doctor.user;
+                                                    return userId || doctor._id;
+                                                })()}
+                                                hospitalId={hospital._id}
+                                                role="staff"
+                                            />
                                         </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {Object.keys(queues).length === 0 && (
-                            <div className="text-center py-4">
-                                <p className="text-gray-500">No active queues at the moment</p>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="text-center py-8">
+                                <p className="text-gray-500 mb-4">No doctors assigned to this hospital</p>
+                                <p className="text-sm text-gray-400">Add doctors in the Doctors tab to manage their queues</p>
                             </div>
                         )}
                     </div>

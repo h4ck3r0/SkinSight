@@ -643,7 +643,7 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                         </span>
                     </div>
                     <div className="text-xs text-gray-500">
-                        Role: {role} | Doctor: {doctorId?.slice(-8)} | Hospital: {hospitalId?.slice(-8)}
+                        Role: {role} | Doctor: {typeof doctorId === 'string' ? doctorId?.slice(-8) : 'Invalid ID'} | Hospital: {typeof hospitalId === 'string' ? hospitalId?.slice(-8) : 'Invalid ID'}
                     </div>
                 </div>
             </div>

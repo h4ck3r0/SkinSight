@@ -205,6 +205,12 @@ const DoctorDashboard = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <h3 className="font-semibold mb-2">Personal Information</h3>
+                                <p className="text-gray-600">Name: {(() => {
+                                    const firstName = doctorProfile.user?.firstName || '';
+                                    const lastName = doctorProfile.user?.lastName || '';
+                                    const doctorName = firstName + (lastName ? ` ${lastName}` : '');
+                                    return doctorName || 'Name Not Available';
+                                })()}</p>
                                 <p className="text-gray-600">Email: {doctorProfile.user?.email || 'N/A'}</p>
                                 <p className="text-gray-600">Specialization: {doctorProfile.profile?.specialization || 'N/A'}</p>
                                 <p className="text-gray-600">Experience: {doctorProfile.profile?.experience || 0} years</p>
@@ -240,7 +246,12 @@ const DoctorDashboard = () => {
                                         <div>
                                             <h3 className="font-semibold">
                                                 {appointment.patient ? 
-                                                    `${appointment.patient.firstName} ${appointment.patient.lastName}` : 
+                                                    (() => {
+                                                        const firstName = appointment.patient.firstName || '';
+                                                        const lastName = appointment.patient.lastName || '';
+                                                        const patientName = firstName + (lastName ? ` ${lastName}` : '');
+                                                        return patientName || 'Patient Name Not Available';
+                                                    })() : 
                                                     'Patient Name Not Available'
                                                 }
                                             </h3>
@@ -320,7 +331,12 @@ const DoctorDashboard = () => {
                                             <div>
                                                 <h3 className="font-semibold">
                                                     {appointment.patient ? 
-                                                        `${appointment.patient.firstName} ${appointment.patient.lastName}` : 
+                                                        (() => {
+                                                            const firstName = appointment.patient.firstName || '';
+                                                            const lastName = appointment.patient.lastName || '';
+                                                            const patientName = firstName + (lastName ? ` ${lastName}` : '');
+                                                            return patientName || 'Patient Name Not Available';
+                                                        })() : 
                                                         'Patient Name Not Available'
                                                     }
                                                 </h3>

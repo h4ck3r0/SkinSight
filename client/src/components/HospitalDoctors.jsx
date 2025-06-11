@@ -41,15 +41,24 @@ export default function HospitalDoctors({ hospitalId, onDoctorAdded }) {
                 
                 const hospitalDoctors = allDoctorsResponse.data.doctors
                     .filter(doctor => hospitalDoctorIds.includes(doctor._id))
-                    .map(doctor => ({
-                        ...doctor,
-                        name: doctor.user ? `${doctor.user.firstName} ${doctor.user.lastName}` : 'Unknown Doctor',
-                        specialization: doctor.specialization || 'Not specified',
-                        experience: doctor.experience || 0,
-                        consultationFee: doctor.consultationFee || 0,
-                        languages: doctor.languages || [],
-                        availability: doctor.availability || []
-                    }));
+                    .map(doctor => {
+                        // Extract user ID properly - handle both string and object cases
+                        const userId = typeof doctor.user === 'object' ? doctor.user._id : doctor.user;
+                        return {
+                            ...doctor,
+                            user: userId, // Ensure user field is always a string ID
+                            name: doctor.user ? 
+                                (typeof doctor.user === 'object' ? 
+                                    `${doctor.user.firstName || ''} ${doctor.user.lastName || ''}`.trim() : 
+                                    'Unknown Doctor'
+                                ) : 'Unknown Doctor',
+                            specialization: doctor.specialization || 'Not specified',
+                            experience: doctor.experience || 0,
+                            consultationFee: doctor.consultationFee || 0,
+                            languages: doctor.languages || [],
+                            availability: doctor.availability || []
+                        };
+                    });
                 
                 setDoctors(hospitalDoctors);
             } else {
@@ -76,11 +85,20 @@ export default function HospitalDoctors({ hospitalId, onDoctorAdded }) {
                 const currentDoctorIds = doctors.map(d => d._id);
                 const available = response.data.doctors
                     .filter(d => !currentDoctorIds.includes(d._id))
-                    .map(doctor => ({
-                        ...doctor,
-                        name: doctor.user ? `${doctor.user.firstName} ${doctor.user.lastName}` : 'Unknown Doctor',
-                        specialization: doctor.specialization || 'Not specified'
-                    }));
+                    .map(doctor => {
+                        // Extract user ID properly - handle both string and object cases
+                        const userId = typeof doctor.user === 'object' ? doctor.user._id : doctor.user;
+                        return {
+                            ...doctor,
+                            user: userId, // Ensure user field is always a string ID
+                            name: doctor.user ? 
+                                (typeof doctor.user === 'object' ? 
+                                    `${doctor.user.firstName || ''} ${doctor.user.lastName || ''}`.trim() : 
+                                    'Unknown Doctor'
+                                ) : 'Unknown Doctor',
+                            specialization: doctor.specialization || 'Not specified'
+                        };
+                    });
                 setAvailableDoctors(available);
             }
         } catch (err) {
@@ -96,8 +114,9 @@ export default function HospitalDoctors({ hospitalId, onDoctorAdded }) {
         }
 
         try {
+            // selectedDoctor is now the user ID directly
             const response = await axios.post(
-                `https://mycarebridge.onrender.com/api/hospital/${hospitalId}/addDoctor/${selectedDoctor}`,
+                `https://mycarebridge.onrender.com/api/hospital/${hospitalId}/doctors/${selectedDoctor}`,
                 {},
                 {
                     headers: {
@@ -174,11 +193,15 @@ export default function HospitalDoctors({ hospitalId, onDoctorAdded }) {
                         className="w-full p-2 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <option value="">Select a doctor</option>
-                        {availableDoctors.map((doctor) => (
-                            <option key={doctor._id} value={doctor._id}>
-                                {doctor.name} - {doctor.specialization}
-                            </option>
-                        ))}
+                        {availableDoctors.map((doctor) => {
+                            // Extract user ID properly - handle both string and object cases
+                            const userId = typeof doctor.user === 'object' ? doctor.user._id : doctor.user;
+                            return (
+                                <option key={doctor._id} value={userId}>
+                                    {doctor.name} - {doctor.specialization}
+                                </option>
+                            );
+                        })}
                     </select>
                     <div className="flex justify-end gap-2">
                         <button
