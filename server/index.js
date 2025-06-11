@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
+import axios from 'axios';
 import { SetupSocket } from './socket.js';
 import authRoutes from './routes/AuthRoutes.js';
 import doctorRoutes from './routes/DoctorRoutes.js';
@@ -18,6 +19,35 @@ console.log('Environment variables:', {
     MONGO_URL: process.env.MONGO_URL
 });
 
+// OpenAI API configuration
+const API_BASE_URL = 'https://api.aimlapi.com/v1';
+const API_KEY = process.env.OPENAI_API_KEY;
+
+const callAPI = async (endpoint, data, headers = {}) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}${endpoint}`, data, {
+            headers: {
+                'Authorization': `Bearer ${API_KEY}`,
+                'Content-Type': 'application/json',
+                'Accept': '*/*',
+                ...headers
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error(`API Error (${endpoint}):`, error.response?.data || error.message);
+        throw error;
+    }
+};
+
+const mockOcrResponse = (text) => ({
+    pages: [{
+        text: text || 'Sample medical report text. Patient shows normal vital signs...',
+        page_number: 1
+    }]
+});
+
+
 const app = express();
 const server = createServer(app);
 
@@ -32,6 +62,101 @@ app.use(cors({
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Chat endpoint
+const apiRouter = express.Router();
+
+// Test endpoint to verify routing
+apiRouter.get('/test', (req, res) => {
+    res.json({ message: 'API router is working!' });
+});
+
+apiRouter.post('/chat', async (req, res) => {
+    try {
+        const { message } = req.body;
+        if (!message) {
+            return res.status(400).json({ error: 'Message is required' });
+        }
+
+        console.log('Sending chat message:', message);
+
+        const apiResponse = await callAPI('/chat/completions', {
+            model: "gpt-4o",
+            messages: [
+                { role: "user", content: message }
+            ]
+        });
+
+        const responseText = apiResponse.choices?.[0]?.message?.content;
+        if (!responseText) {
+            throw new Error('Invalid response from chat API');
+        }
+
+        console.log('Chat response received');
+        res.json({ response: responseText });
+
+    } catch (error) {
+        console.error('Chat error:', error.response?.data || error.message);
+        res.status(500).json({
+            error: 'Failed to process chat message',
+            details: error.response?.data || error.message
+        });
+    }
+});
+
+// Image analysis endpoint
+apiRouter.post('/analyze-image', async (req, res) => {
+    try {
+        const { image } = req.body;
+        if (!image) {
+            return res.status(400).json({ error: 'Image data is required' });
+        }
+
+        console.log('Processing image...');
+        const ocrResponse = mockOcrResponse();
+        const extractedText = ocrResponse.pages[0].text;
+
+        const analysisResponse = await callAPI('/chat/completions', {
+            model: "gpt-4o",
+            messages: [
+                {
+                    role: "system",
+                    content: "You are a medical expert. Analyze the given medical report text and provide a clear summary."
+                },
+                {
+                    role: "user",
+                    content: `Analyze this medical report text and provide a clear summary:\n\n${extractedText}`
+                }
+            ]
+        });
+
+        const analysis = analysisResponse.choices?.[0]?.message?.content;
+        if (!analysis) {
+            throw new Error('Failed to analyze the medical text');
+        }
+
+        res.json({
+            text: extractedText,
+            analysis: analysis
+        });
+
+    } catch (error) {
+        console.error('Image analysis error:', error.response?.data || error.message);
+        res.status(500).json({
+            error: 'Failed to analyze image',
+            details: error.response?.data || error.message
+        });
+    }
+});
+
+// Mount API routes FIRST
+app.use('/api', apiRouter);
+
+// Debug middleware to log all requests
+app.use((req, res, next) => {
+    console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
+    next();
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
