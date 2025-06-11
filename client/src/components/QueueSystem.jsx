@@ -47,10 +47,10 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             setIsConnected(true);
             addToLog('Connected to server', 'success');
             
-            // Join doctor's room if doctor role
-            if (role === 'doctor' && doctorId) {
-                socket.emit('joinRoom', doctorId);
-                addToLog(`Joined doctor room: ${doctorId}`, 'info');
+            // Join user's room (both doctor and patient join with their user ID)
+            if (user._id) {
+                socket.emit('joinRoom', user._id);
+                addToLog(`Joined user room: ${user._id}`, 'info');
             }
             
             // Get initial queue status
@@ -86,6 +86,10 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
 
         const handlePatientCalled = (data) => {
             console.log('Patient called:', data);
+            console.log('Current role:', role);
+            console.log('Current user ID:', user._id);
+            console.log('Data patient ID:', data.patientId);
+            
             if (role === 'patient' && data.patientId === user._id) {
                 toast.success('You are being called by the doctor!');
                 setIsInQueue(false);
@@ -93,6 +97,7 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                 addToLog('You have been called!', 'success');
             }
             if (role === 'doctor' && data.patientId) {
+                console.log('Setting current patient for doctor:', data.patientId);
                 setCurrentPatient(data.patientId);
                 setIsInConsultation(true);
                 addToLog(`Patient ${data.patientId} called for consultation`, 'success');
@@ -122,8 +127,16 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
         };
 
         const handleOnlineModeToggle = (data) => {
-            console.log('Online mode toggle:', data);
+            console.log('Online mode toggle:', {
+                role,
+                user_id: user._id,
+                currentPatient,
+                patientId: data.patientId,
+                newOnlineMode: data.isOnline
+            });
+            
             if (role === 'patient' && data.patientId === user._id) {
+                console.log('Patient handling online mode toggle');
                 setIsOnlineMode(data.isOnline);
                 if (data.isOnline) {
                     setShowChat(true);
@@ -136,6 +149,22 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                 }
             }
             if (role === 'doctor' && data.patientId === currentPatient) {
+                console.log('Doctor handling online mode toggle');
+                setIsOnlineMode(data.isOnline);
+                if (data.isOnline) {
+                    setShowChat(true);
+                    addToLog('Patient activated online mode', 'success');
+                } else {
+                    setShowChat(false);
+                    setIsVideoCallActive(false);
+                    addToLog('Patient deactivated online mode', 'info');
+                }
+            }
+            
+            // Additional check for doctor - if no currentPatient is set, still handle the event
+            if (role === 'doctor' && !currentPatient && data.patientId) {
+                console.log('Doctor handling online mode toggle (no currentPatient set)');
+                setCurrentPatient(data.patientId);
                 setIsOnlineMode(data.isOnline);
                 if (data.isOnline) {
                     setShowChat(true);
@@ -338,10 +367,25 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
         }
         
         const newOnlineMode = !isOnlineMode;
+        const patientId = role === 'patient' ? user._id : currentPatient;
+        
+        console.log('Toggling online mode:', {
+            role,
+            user_id: user._id,
+            currentPatient,
+            patientId,
+            newOnlineMode
+        });
+        
+        if (role === 'doctor' && !currentPatient) {
+            toast.error('No patient in consultation');
+            return;
+        }
+        
         socket.emit('toggleOnlineMode', {
             doctorId,
             hospitalId,
-            patientId: role === 'patient' ? user._id : currentPatient,
+            patientId,
             isOnline: newOnlineMode
         });
         setIsOnlineMode(newOnlineMode);
@@ -596,26 +640,28 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                             <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                             <span className="font-medium text-green-700">In Consultation</span>
                         </div>
-                        {role === 'patient' && (
-                            <button
-                                onClick={handleToggleOnlineMode}
-                                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                                    isOnlineMode 
-                                        ? 'bg-blue-500 hover:bg-blue-600 text-white' 
-                                        : 'bg-gray-500 hover:bg-gray-600 text-white'
-                                }`}
-                            >
-                                {isOnlineMode ? 'Online Mode: ON' : 'Online Mode: OFF'}
-                            </button>
-                        )}
-                        {(role === 'doctor' || role === 'staff') && (
-                            <button
-                                onClick={() => handleCompleteConsultation(currentPatient)}
-                                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors"
-                            >
-                                Complete Consultation
-                            </button>
-                        )}
+                        <div className="flex gap-2">
+                            {(role === 'patient' || role === 'doctor') && (
+                                <button
+                                    onClick={handleToggleOnlineMode}
+                                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                                        isOnlineMode 
+                                            ? 'bg-blue-500 hover:bg-blue-600 text-white' 
+                                            : 'bg-gray-500 hover:bg-gray-600 text-white'
+                                    }`}
+                                >
+                                    {isOnlineMode ? 'Online Mode: ON' : 'Online Mode: OFF'}
+                                </button>
+                            )}
+                            {(role === 'doctor' || role === 'staff') && (
+                                <button
+                                    onClick={() => handleCompleteConsultation(currentPatient)}
+                                    className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors"
+                                >
+                                    Complete Consultation
+                                </button>
+                            )}
+                        </div>
                     </div>
                     
                     {role === 'doctor' && currentPatient && (
@@ -625,7 +671,7 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             )}
 
             {/* Online Consultation Features */}
-            {isInConsultation && isOnlineMode && (
+            {isInConsultation && (isOnlineMode || role === 'doctor') && (
                 <div className="bg-white rounded-lg border p-6">
                     <h3 className="text-lg font-semibold mb-4">Online Consultation</h3>
                     

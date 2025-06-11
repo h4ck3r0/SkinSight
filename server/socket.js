@@ -173,6 +173,8 @@ export const SetupSocket = (server) => {
 
         // Online consultation handlers
         socket.on('toggleOnlineMode', ({ doctorId, hospitalId, patientId, isOnline }) => {
+            console.log('Toggle online mode event:', { doctorId, hospitalId, patientId, isOnline });
+            
             // Notify both doctor and patient about online mode change
             io.to(doctorId).emit('onlineModeToggle', {
                 doctorId,
@@ -186,6 +188,8 @@ export const SetupSocket = (server) => {
                 patientId,
                 isOnline
             });
+            
+            console.log(`Sent onlineModeToggle to doctor ${doctorId} and patient ${patientId}`);
         });
 
         socket.on('sendMessage', ({ doctorId, hospitalId, sender, receiver, message }) => {
