@@ -47,10 +47,10 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             setIsConnected(true);
             addToLog('Connected to server', 'success');
             
-            // Join user's room (both doctor and patient join with their user ID)
+            // Join user's room using MongoDB user ID (long ID)
             if (user._id) {
                 socket.emit('joinRoom', user._id);
-                addToLog(`Joined user room: ${user._id}`, 'info');
+                addToLog(`Joined user room with MongoDB ID: ${user._id}`, 'info');
             }
             
             // Get initial queue status
@@ -91,6 +91,7 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             console.log('Data patient ID:', data.patientId);
             
             if (role === 'patient' && data.patientId === user._id) {
+                console.log('Patient entering consultation mode');
                 toast.success('You are being called by the doctor!');
                 setIsInQueue(false);
                 setIsInConsultation(true);
@@ -98,6 +99,7 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             }
             if (role === 'doctor' && data.patientId) {
                 console.log('Setting current patient for doctor:', data.patientId);
+                console.log('Doctor entering consultation mode');
                 setCurrentPatient(data.patientId);
                 setIsInConsultation(true);
                 addToLog(`Patient ${data.patientId} called for consultation`, 'success');
@@ -107,6 +109,7 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
         const handleConsultationComplete = (data) => {
             console.log('Consultation complete:', data);
             if (role === 'patient' && data.patientId === user._id) {
+                console.log('Patient leaving consultation mode');
                 setIsInConsultation(false);
                 setIsOnlineMode(false);
                 setShowChat(false);
@@ -116,6 +119,7 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                 addToLog('Consultation completed', 'success');
             }
             if (role === 'doctor' && data.patientId === currentPatient) {
+                console.log('Doctor completing consultation');
                 setIsInConsultation(false);
                 setCurrentPatient(null);
                 setIsOnlineMode(false);
@@ -127,12 +131,13 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
         };
 
         const handleOnlineModeToggle = (data) => {
-            console.log('Online mode toggle:', {
+            console.log('Online mode toggle received:', {
                 role,
                 user_id: user._id,
                 currentPatient,
                 patientId: data.patientId,
-                newOnlineMode: data.isOnline
+                newOnlineMode: data.isOnline,
+                isInConsultation
             });
             
             if (role === 'patient' && data.patientId === user._id) {
@@ -366,6 +371,12 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             return;
         }
         
+        // Check if in consultation
+        if (!isInConsultation) {
+            toast.error('You must be in consultation to use online mode');
+            return;
+        }
+        
         const newOnlineMode = !isOnlineMode;
         const patientId = role === 'patient' ? user._id : currentPatient;
         
@@ -374,7 +385,8 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             user_id: user._id,
             currentPatient,
             patientId,
-            newOnlineMode
+            newOnlineMode,
+            isInConsultation
         });
         
         if (role === 'doctor' && !currentPatient) {
@@ -531,6 +543,18 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                             <p className="text-lg font-bold text-blue-800">{estimatedWaitTime} min</p>
                         </div>
                     )}
+                    {(role === 'patient' || role === 'doctor') && (
+                        <div className={`p-4 rounded-lg text-center ${
+                            isInConsultation ? 'bg-green-50' : 'bg-gray-50'
+                        }`}>
+                            <p className="text-sm text-gray-600">Consultation</p>
+                            <p className={`text-lg font-bold ${
+                                isInConsultation ? 'text-green-600' : 'text-gray-600'
+                            }`}>
+                                {isInConsultation ? 'In Progress' : 'Not Started'}
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -566,6 +590,22 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                             className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:bg-gray-400 transition-colors"
                         >
                             Call Next Patient ({queueStatus?.length || 0} waiting)
+                        </button>
+                    )}
+                    {(role === 'doctor' || role === 'staff') && isInConsultation && currentPatient && (
+                        <button
+                            onClick={() => {
+                                console.log('Manual test: Sending online mode toggle');
+                                socket.emit('toggleOnlineMode', {
+                                    doctorId,
+                                    hospitalId,
+                                    patientId: currentPatient,
+                                    isOnline: true
+                                });
+                            }}
+                            className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors"
+                        >
+                            Test Online Mode
                         </button>
                     )}
                     <button
@@ -628,6 +668,49 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                             </div>
                         ))
                     )}
+                </div>
+            </div>
+
+            {/* Debug Info */}
+            <div className="bg-white rounded-lg border p-6">
+                <h3 className="text-lg font-semibold mb-4">Debug Info</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div className="bg-gray-50 p-3 rounded">
+                        <p className="font-medium">Role</p>
+                        <p className="text-gray-600">{role}</p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                        <p className="font-medium">MongoDB User ID</p>
+                        <p className="text-gray-600 text-xs break-all">{user._id}</p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                        <p className="font-medium">Socket ID</p>
+                        <p className="text-gray-600">{socket?.id?.slice(-4) || 'N/A'}</p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                        <p className="font-medium">In Consultation</p>
+                        <p className="text-gray-600">{isInConsultation ? 'Yes' : 'No'}</p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                        <p className="font-medium">Online Mode</p>
+                        <p className="text-gray-600">{isOnlineMode ? 'ON' : 'OFF'}</p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                        <p className="font-medium">Current Patient (MongoDB ID)</p>
+                        <p className="text-gray-600 text-xs break-all">{currentPatient || 'None'}</p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                        <p className="font-medium">In Queue</p>
+                        <p className="text-gray-600">{isInQueue ? 'Yes' : 'No'}</p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                        <p className="font-medium">Queue Active</p>
+                        <p className="text-gray-600">{isQueueActive ? 'Yes' : 'No'}</p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                        <p className="font-medium">Connected</p>
+                        <p className="text-gray-600">{isConnected ? 'Yes' : 'No'}</p>
+                    </div>
                 </div>
             </div>
 

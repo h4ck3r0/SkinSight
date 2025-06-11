@@ -78,7 +78,7 @@ export const SetupSocket = (server) => {
 
         socket.on('joinRoom', (userId) => {
             socket.join(userId);
-            console.log(`User ${userId} joined their room`);
+            console.log(`User ${userId} (MongoDB ID) joined their room`);
         });
 
         socket.on('joinQueue', async ({ doctorId, hospitalId, patientId }) => {
@@ -117,10 +117,13 @@ export const SetupSocket = (server) => {
         });
 
         socket.on('callNextPatient', ({ doctorId, hospitalId }) => {
+            console.log('Call next patient:', { doctorId, hospitalId });
             const queue = getQueue(doctorId, hospitalId);
             if (queue.patients.length > 0) {
                 const nextPatient = queue.patients.shift();
                 queue.currentPatient = nextPatient;
+
+                console.log('Calling patient:', nextPatient);
 
                 // Notify the patient
                 io.to(nextPatient).emit('patientCalled', {
@@ -129,6 +132,15 @@ export const SetupSocket = (server) => {
                     patientId: nextPatient
                 });
 
+                // Notify the doctor about the patient being called
+                io.to(doctorId).emit('patientCalled', {
+                    doctorId,
+                    hospitalId,
+                    patientId: nextPatient
+                });
+
+                console.log(`Sent patientCalled to patient ${nextPatient} and doctor ${doctorId}`);
+
                 // Notify everyone about the queue update
                 io.to(doctorId).emit('queueUpdate', {
                     doctorId,
@@ -136,6 +148,8 @@ export const SetupSocket = (server) => {
                     queue: queue.patients,
                     isActive: queue.isActive
                 });
+            } else {
+                console.log('No patients in queue to call');
             }
         });
 
