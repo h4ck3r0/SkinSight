@@ -34,12 +34,22 @@ const VideoCall = ({
         }
         
         return () => {
+            console.log('VideoCall component cleanup - stopping streams and destroying peer');
             if (localStreamRef.current) {
-                localStreamRef.current.getTracks().forEach(track => track.stop());
+                localStreamRef.current.getTracks().forEach(track => {
+                    track.stop();
+                    console.log('Stopped track:', track.kind);
+                });
             }
             if (peerRef.current) {
+                console.log('Destroying peer connection');
                 peerRef.current.destroy();
+                peerRef.current = null;
             }
+            setLocalStream(null);
+            setRemoteStream(null);
+            setIsConnected(false);
+            setIsConnecting(false);
         };
     }, [isActive, loading, Peer]);
 
@@ -49,7 +59,38 @@ const VideoCall = ({
             console.log('Creating peer connection for:', { isInitiator, remoteUserId });
             createPeer(isInitiator);
         }
+        
+        return () => {
+            // Cleanup peer when remote user ID changes
+            if (peerRef.current) {
+                console.log('Cleaning up peer due to remote user ID change');
+                peerRef.current.destroy();
+                peerRef.current = null;
+            }
+        };
     }, [isActive, localStream, remoteUserId, isInitiator, Peer]);
+
+    // Handle when video call becomes inactive
+    useEffect(() => {
+        if (!isActive) {
+            console.log('Video call became inactive, cleaning up');
+            if (localStreamRef.current) {
+                localStreamRef.current.getTracks().forEach(track => {
+                    track.stop();
+                    console.log('Stopped track:', track.kind);
+                });
+            }
+            if (peerRef.current) {
+                console.log('Destroying peer due to inactive call');
+                peerRef.current.destroy();
+                peerRef.current = null;
+            }
+            setLocalStream(null);
+            setRemoteStream(null);
+            setIsConnected(false);
+            setIsConnecting(false);
+        }
+    }, [isActive]);
 
     const startLocalStream = async () => {
         try {
@@ -87,12 +128,17 @@ const VideoCall = ({
         });
 
         peer.on('signal', (data) => {
-            console.log('Sending signal to remote peer:', remoteUserId);
-            socket.emit('videoCallSignal', {
-                signal: data,
-                from: localUserId,
-                to: remoteUserId
-            });
+            // Only send signal if peer is not destroyed
+            if (peerRef.current && peerRef.current === peer) {
+                console.log('Sending signal to remote peer:', remoteUserId);
+                socket.emit('videoCallSignal', {
+                    signal: data,
+                    from: localUserId,
+                    to: remoteUserId
+                });
+            } else {
+                console.log('Peer destroyed, not sending signal');
+            }
         });
 
         peer.on('stream', (stream) => {
@@ -131,17 +177,41 @@ const VideoCall = ({
     const handleSignal = (signal) => {
         console.log('Handling signal:', signal);
         
+        // Check if peer exists and is not destroyed
         if (peerRef.current) {
-            console.log('Signaling existing peer');
-            peerRef.current.signal(signal);
+            try {
+                console.log('Signaling existing peer');
+                peerRef.current.signal(signal);
+            } catch (error) {
+                console.error('Error signaling peer:', error);
+                // If peer is destroyed, create a new one
+                if (error.message.includes('destroyed')) {
+                    console.log('Peer was destroyed, creating new peer');
+                    createPeer(false);
+                    setTimeout(() => {
+                        if (peerRef.current) {
+                            try {
+                                console.log('Signaling new peer');
+                                peerRef.current.signal(signal);
+                            } catch (err) {
+                                console.error('Error signaling new peer:', err);
+                            }
+                        }
+                    }, 200);
+                }
+            }
         } else if (localStream && remoteUserId) {
             console.log('Creating new peer for signal');
             createPeer(false);
             // Give the peer a moment to initialize
             setTimeout(() => {
                 if (peerRef.current) {
-                    console.log('Signaling new peer');
-                    peerRef.current.signal(signal);
+                    try {
+                        console.log('Signaling new peer');
+                        peerRef.current.signal(signal);
+                    } catch (error) {
+                        console.error('Error signaling new peer:', error);
+                    }
                 }
             }, 200);
         } else {
@@ -150,11 +220,17 @@ const VideoCall = ({
     };
 
     const handleEndCall = () => {
+        console.log('Ending video call manually');
         if (localStreamRef.current) {
-            localStreamRef.current.getTracks().forEach(track => track.stop());
+            localStreamRef.current.getTracks().forEach(track => {
+                track.stop();
+                console.log('Stopped track:', track.kind);
+            });
         }
         if (peerRef.current) {
+            console.log('Destroying peer connection');
             peerRef.current.destroy();
+            peerRef.current = null;
         }
         setLocalStream(null);
         setRemoteStream(null);
