@@ -143,7 +143,6 @@ export const SetupSocket = (server) => {
             const queue = getQueue(doctorId, hospitalId);
             if (queue.currentPatient === patientId) {
                 queue.currentPatient = null;
-                // Notify the patient
                 io.to(patientId).emit('consultationComplete', {
                     doctorId,
                     hospitalId,
@@ -169,6 +168,72 @@ export const SetupSocket = (server) => {
                 hospitalId,
                 queue: queue.patients,
                 isActive: queue.isActive
+            });
+        });
+
+        // Online consultation handlers
+        socket.on('toggleOnlineMode', ({ doctorId, hospitalId, patientId, isOnline }) => {
+            // Notify both doctor and patient about online mode change
+            io.to(doctorId).emit('onlineModeToggle', {
+                doctorId,
+                hospitalId,
+                patientId,
+                isOnline
+            });
+            io.to(patientId).emit('onlineModeToggle', {
+                doctorId,
+                hospitalId,
+                patientId,
+                isOnline
+            });
+        });
+
+        socket.on('sendMessage', ({ doctorId, hospitalId, sender, receiver, message }) => {
+            // Send message to both sender and receiver
+            io.to(sender).emit('newMessage', {
+                sender,
+                receiver,
+                message,
+                timestamp: new Date()
+            });
+            io.to(receiver).emit('newMessage', {
+                sender,
+                receiver,
+                message,
+                timestamp: new Date()
+            });
+        });
+
+        socket.on('requestVideoCall', ({ doctorId, hospitalId, patientId }) => {
+            // Notify the patient about video call request
+            io.to(patientId).emit('videoCallRequest', {
+                doctorId,
+                hospitalId,
+                patientId
+            });
+        });
+
+        socket.on('videoCallResponse', ({ doctorId, hospitalId, patientId, accepted }) => {
+            // Notify the doctor about video call response
+            io.to(doctorId).emit('videoCallResponse', {
+                doctorId,
+                hospitalId,
+                patientId,
+                accepted
+            });
+        });
+
+        socket.on('endVideoCall', ({ doctorId, hospitalId, patientId }) => {
+            // Notify both parties that video call ended
+            io.to(doctorId).emit('videoCallEnded', {
+                doctorId,
+                hospitalId,
+                patientId
+            });
+            io.to(patientId).emit('videoCallEnded', {
+                doctorId,
+                hospitalId,
+                patientId
             });
         });
 
