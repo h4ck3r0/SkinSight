@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useSocket } from "../context/SocketContext";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-hot-toast";
+import VideoCall from "./VideoCall";
 
 const QueueSystem = ({ doctorId, hospitalId, role }) => {
     const { socket } = useSocket();
@@ -22,6 +23,13 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
     const [newMessage, setNewMessage] = useState('');
     const [isVideoCallActive, setIsVideoCallActive] = useState(false);
     const [showChat, setShowChat] = useState(false);
+    
+    // Video call state
+    const [videoCallData, setVideoCallData] = useState({
+        isActive: false,
+        isInitiator: false,
+        remoteUserId: null
+    });
 
     // Add event to log
     const addToLog = (message, type = 'info') => {
@@ -192,34 +200,96 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             }]);
         };
 
-        const handleVideoCallRequest = (data) => {
-            console.log('Video call request:', data);
-            if (role === 'patient' && data.patientId === user._id) {
-                toast.success('Doctor is requesting a video call!');
-                addToLog('Video call request received', 'success');
+        const handleRequestVideoCall = () => {
+            if (!isConnected) {
+                toast.error('Not connected to server');
+                return;
             }
-            if (role === 'doctor' && data.patientId === currentPatient) {
-                addToLog('Video call request sent', 'success');
-            }
+            
+            const remoteUserId = role === 'patient' ? doctorId : currentPatient;
+            
+            socket.emit('requestVideoCall', {
+                doctorId,
+                hospitalId,
+                patientId: role === 'patient' ? user._id : currentPatient
+            });
+            
+            // Start video call as initiator
+            setVideoCallData({
+                isActive: true,
+                isInitiator: true,
+                remoteUserId
+            });
+            
+            addToLog('Video call request sent', 'info');
         };
 
-        const handleVideoCallResponse = (data) => {
-            console.log('Video call response:', data);
-            if (data.accepted) {
-                setIsVideoCallActive(true);
-                toast.success('Video call started!');
-                addToLog('Video call started', 'success');
-            } else {
-                toast.error('Video call declined');
-                addToLog('Video call declined', 'error');
+        const handleAcceptVideoCall = () => {
+            if (!isConnected) {
+                toast.error('Not connected to server');
+                return;
             }
+            
+            const remoteUserId = role === 'patient' ? doctorId : currentPatient;
+            
+            socket.emit('videoCallResponse', {
+                doctorId,
+                hospitalId,
+                patientId: user._id,
+                accepted: true
+            });
+            
+            // Start video call as receiver
+            setVideoCallData({
+                isActive: true,
+                isInitiator: false,
+                remoteUserId
+            });
+            
+            addToLog('Video call accepted', 'success');
         };
 
-        const handleVideoCallEnded = (data) => {
-            console.log('Video call ended:', data);
-            setIsVideoCallActive(false);
-            toast.info('Video call ended');
+        const handleDeclineVideoCall = () => {
+            if (!isConnected) {
+                toast.error('Not connected to server');
+                return;
+            }
+            
+            socket.emit('videoCallResponse', {
+                doctorId,
+                hospitalId,
+                patientId: user._id,
+                accepted: false
+            });
+            addToLog('Video call declined', 'info');
+        };
+
+        const handleEndVideoCall = () => {
+            if (!isConnected) {
+                toast.error('Not connected to server');
+                return;
+            }
+            
+            socket.emit('endVideoCall', {
+                doctorId,
+                hospitalId,
+                patientId: role === 'patient' ? user._id : currentPatient
+            });
+            
+            setVideoCallData({
+                isActive: false,
+                isInitiator: false,
+                remoteUserId: null
+            });
+            
             addToLog('Video call ended', 'info');
+        };
+
+        const handleVideoCallSignal = (data) => {
+            console.log('Video call signal received:', data);
+            if (window.videoCallHandlers && window.videoCallHandlers[user._id]) {
+                window.videoCallHandlers[user._id](data.signal);
+            }
         };
 
         const handleQueueStatus = (data) => {
@@ -235,6 +305,41 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             console.error('Socket error:', error);
             addToLog(`Error: ${error}`, 'error');
             toast.error(error);
+        };
+
+        const handleVideoCallRequest = (data) => {
+            console.log('Video call request received:', data);
+            if (role === 'patient' && data.patientId === user._id) {
+                toast.success('Doctor is requesting a video call!');
+                addToLog('Video call request received', 'success');
+            }
+            if (role === 'doctor' && data.patientId === currentPatient) {
+                addToLog('Video call request sent', 'success');
+            }
+        };
+
+        const handleVideoCallResponse = (data) => {
+            console.log('Video call response received:', data);
+            if (data.accepted) {
+                setIsVideoCallActive(true);
+                toast.success('Video call started!');
+                addToLog('Video call started', 'success');
+            } else {
+                toast.error('Video call declined');
+                addToLog('Video call declined', 'error');
+            }
+        };
+
+        const handleVideoCallEnded = (data) => {
+            console.log('Video call ended:', data);
+            setIsVideoCallActive(false);
+            setVideoCallData({
+                isActive: false,
+                isInitiator: false,
+                remoteUserId: null
+            });
+            toast.info('Video call ended');
+            addToLog('Video call ended', 'info');
         };
 
         // Check if already connected
@@ -255,6 +360,7 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
         socket.on('videoCallRequest', handleVideoCallRequest);
         socket.on('videoCallResponse', handleVideoCallResponse);
         socket.on('videoCallEnded', handleVideoCallEnded);
+        socket.on('videoCallSignal', handleVideoCallSignal);
         socket.on('error', handleError);
 
         return () => {
@@ -270,6 +376,7 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             socket.off('videoCallRequest', handleVideoCallRequest);
             socket.off('videoCallResponse', handleVideoCallResponse);
             socket.off('videoCallEnded', handleVideoCallEnded);
+            socket.off('videoCallSignal', handleVideoCallSignal);
             socket.off('error', handleError);
         };
     }, [socket, doctorId, hospitalId, user._id, role]);
@@ -419,65 +526,6 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
         socket.emit('sendMessage', messageData);
         setNewMessage('');
         addToLog('Message sent', 'info');
-    };
-
-    const handleRequestVideoCall = () => {
-        if (!isConnected) {
-            toast.error('Not connected to server');
-            return;
-        }
-        
-        socket.emit('requestVideoCall', {
-            doctorId,
-            hospitalId,
-            patientId: role === 'patient' ? user._id : currentPatient
-        });
-        addToLog('Video call request sent', 'info');
-    };
-
-    const handleAcceptVideoCall = () => {
-        if (!isConnected) {
-            toast.error('Not connected to server');
-            return;
-        }
-        
-        socket.emit('videoCallResponse', {
-            doctorId,
-            hospitalId,
-            patientId: user._id,
-            accepted: true
-        });
-        addToLog('Video call accepted', 'success');
-    };
-
-    const handleDeclineVideoCall = () => {
-        if (!isConnected) {
-            toast.error('Not connected to server');
-            return;
-        }
-        
-        socket.emit('videoCallResponse', {
-            doctorId,
-            hospitalId,
-            patientId: user._id,
-            accepted: false
-        });
-        addToLog('Video call declined', 'info');
-    };
-
-    const handleEndVideoCall = () => {
-        if (!isConnected) {
-            toast.error('Not connected to server');
-            return;
-        }
-        
-        socket.emit('endVideoCall', {
-            doctorId,
-            hospitalId,
-            patientId: role === 'patient' ? user._id : currentPatient
-        });
-        setIsVideoCallActive(false);
-        addToLog('Video call ended', 'info');
     };
 
     return (
@@ -911,6 +959,16 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                     </div>
                 </div>
             )}
+
+            {/* Video Call Component */}
+            <VideoCall
+                isActive={videoCallData.isActive}
+                onEndCall={handleEndVideoCall}
+                socket={socket}
+                localUserId={user._id}
+                remoteUserId={videoCallData.remoteUserId}
+                isInitiator={videoCallData.isInitiator}
+            />
         </div>
     );
 };

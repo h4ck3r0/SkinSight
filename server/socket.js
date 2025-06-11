@@ -255,6 +255,16 @@ export const SetupSocket = (server) => {
             });
         });
 
+        // WebRTC signal handling
+        socket.on('videoCallSignal', ({ signal, from, to }) => {
+            console.log(`Relaying video call signal from ${from} to ${to}`);
+            io.to(to).emit('videoCallSignal', {
+                signal,
+                from,
+                to
+            });
+        });
+
         socket.on('disconnect', () => {
             console.log('Client disconnected:', socket.id);
         });
