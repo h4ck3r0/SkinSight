@@ -124,37 +124,37 @@ export default function HospitalDashborad() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-100 p-8">
-            <div className="max-w-7xl mx-auto">
+        <div className="min-h-screen bg-gray-50">
+            <div className="max-w-7xl mx-auto px-6 py-8">
                 {/* Tab Navigation */}
-                <div className="mb-6">
-                    <nav className="flex space-x-4">
+                <div className="bg-white rounded-lg shadow-md p-4 mb-8">
+                    <nav className="flex space-x-6">
                         <button
                             onClick={() => setActiveTab('overview')}
-                            className={`px-4 py-2 rounded ${
+                            className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
                                 activeTab === 'overview'
-                                    ? 'bg-blue-500 text-white'
-                                    : 'bg-gray-200 text-gray-700'
+                                    ? 'bg-blue-500 text-white shadow-md hover:bg-blue-600'
+                                    : 'text-gray-600 hover:bg-gray-100'
                             }`}
                         >
                             Overview
                         </button>
                         <button
                             onClick={() => setActiveTab('doctors')}
-                            className={`px-4 py-2 rounded ${
+                            className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
                                 activeTab === 'doctors'
-                                    ? 'bg-blue-500 text-white'
-                                    : 'bg-gray-200 text-gray-700'
+                                    ? 'bg-blue-500 text-white shadow-md hover:bg-blue-600'
+                                    : 'text-gray-600 hover:bg-gray-100'
                             }`}
                         >
                             Doctors
                         </button>
                         <button
                             onClick={() => setActiveTab('queues')}
-                            className={`px-4 py-2 rounded ${
+                            className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
                                 activeTab === 'queues'
-                                    ? 'bg-blue-500 text-white'
-                                    : 'bg-gray-200 text-gray-700'
+                                    ? 'bg-blue-500 text-white shadow-md hover:bg-blue-600'
+                                    : 'text-gray-600 hover:bg-gray-100'
                             }`}
                         >
                             Queue Management
@@ -163,8 +163,8 @@ export default function HospitalDashborad() {
                 </div>
 
                 {activeTab === 'overview' && (
-                    <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-                        <h1 className="text-3xl font-bold mb-6 text-gray-800">{hospital.name}</h1>
+                    <div className="bg-white rounded-lg shadow-md p-8 mb-8 border border-gray-100">
+                        <h1 className="text-3xl font-bold mb-6 text-gray-800 pb-2 border-b">{hospital.name}</h1>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
@@ -188,8 +188,8 @@ export default function HospitalDashborad() {
                 )}
 
                 {activeTab === 'doctors' && (
-                    <div className="bg-white rounded-lg shadow-lg p-6">
-                        <h2 className="text-2xl font-bold mb-6 text-gray-800">Doctors</h2>
+                    <div className="bg-white rounded-lg shadow-md p-8 border border-gray-100">
+                        <h2 className="text-2xl font-bold mb-6 text-gray-800 pb-2 border-b">Doctors</h2>
                         <HospitalDoctors 
                             hospitalId={hospital._id} 
                             onDoctorAdded={handleDoctorAdded}
@@ -198,15 +198,15 @@ export default function HospitalDashborad() {
                 )}
 
                 {activeTab === 'queues' && (
-                    <div className="bg-white rounded-lg shadow-lg p-6">
-                        <h2 className="text-2xl font-bold mb-6 text-gray-800">Queue Management</h2>
+                    <div className="bg-white rounded-lg shadow-md p-8 border border-gray-100">
+                        <h2 className="text-2xl font-bold mb-6 text-gray-800 pb-2 border-b">Queue Management</h2>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {Object.entries(queues).map(([key, queue]) => {
                                 const [doctorId, hospitalId] = key.split(':');
                                 const doctor = hospital.doctors.find(d => d._id === doctorId);
                                 return (
-                                    <div key={key} className="border rounded-lg p-4">
+                                    <div key={key} className="border rounded-lg p-6 bg-gradient-to-r from-gray-50 to-white shadow-sm hover:shadow-md transition-all duration-200">
                                         <h3 className="text-lg font-semibold mb-2">
                                             {doctor ? `${doctor.name} (${doctor.specialization})` : `Doctor ID: ${doctorId}`}
                                         </h3>

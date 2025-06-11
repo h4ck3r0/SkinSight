@@ -126,162 +126,78 @@ const DoctorDashboard = () => {
     const today = new Date();
     const todayString = today.toDateString();
     
-    console.log('Today:', todayString);
-    console.log('All appointments:', doctorProfile?.profile?.appointments);
-    
     const todaysAppointments = doctorProfile?.profile?.appointments?.filter(appointment => {
         if (!appointment.date) return false;
         
         const appointmentDate = new Date(appointment.date);
         const appointmentString = appointmentDate.toDateString();
         
-        console.log('Appointment date string:', appointmentString);
-        console.log('Matches today:', appointmentString === todayString);
-        
         return appointmentString === todayString && !appointment.isAvailable;
     }) || [];
-    
-    console.log('Filtered today\'s appointments:', todaysAppointments);
 
     return (
-        <div className="container mx-auto px-4 py-8">
-            <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold">Doctor Dashboard</h1>
-                
-                {/* Socket Connection Status */}
-                <div className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${isSocketConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                    <span className="text-sm text-gray-600">
-                        {isSocketConnected ? 'Connected' : 'Disconnected'}
-                    </span>
-                </div>
-            </div>
-            
-            {/* Doctor Profile Section */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-                <h2 className="text-xl font-semibold mb-4">Doctor Profile</h2>
-                {doctorProfile?.profile ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <h3 className="font-semibold mb-2">Personal Information</h3>
-                            <p className="text-gray-600">Email: {doctorProfile.user?.email || 'N/A'}</p>
-                            <p className="text-gray-600">Specialization: {doctorProfile.profile?.specialization || 'N/A'}</p>
-                            <p className="text-gray-600">Experience: {doctorProfile.profile?.experience || 0} years</p>
-                            <p className="text-gray-600">Consultation Fee: ${doctorProfile.profile?.consultationFee || 0}</p>
-                        </div>
-                        <div>
-                            <h3 className="font-semibold mb-2">Qualifications</h3>
-                            {doctorProfile.profile?.qualifications?.length > 0 ? (
-                                doctorProfile.profile.qualifications.map((qual, index) => (
-                                    <div key={qual._id || index} className="mb-2">
-                                        <p className="text-gray-600">Degree: {qual.degree || 'N/A'}</p>
-                                        <p className="text-gray-600">Institution: {qual.institution || 'N/A'}</p>
-                                        <p className="text-gray-600">Year: {qual.year || 'N/A'}</p>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-gray-500">No qualifications added</p>
-                            )}
-                        </div>
+        <div className="min-h-screen bg-gray-50">
+            <div className="container mx-auto px-6 py-8">
+                <div className="flex justify-between items-center mb-8 bg-white rounded-lg shadow-md p-6">
+                    <h1 className="text-3xl font-bold text-gray-800">Doctor Dashboard</h1>
+                    
+                    <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-full">
+                        <div className={`w-3 h-3 rounded-full ${isSocketConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                        <span className={`text-sm font-medium ${isSocketConnected ? 'text-green-600' : 'text-red-600'}`}>
+                            {isSocketConnected ? 'Connected' : 'Disconnected'}
+                        </span>
                     </div>
-                ) : (
-                    <p className="text-gray-500">Profile information not available</p>
-                )}
-            </div>
+                </div>
 
-            {/* Today's Appointments Section */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-                <h2 className="text-xl font-semibold mb-4">Today's Appointments</h2>
-                {todaysAppointments.length > 0 ? (
-                    <div className="space-y-4">
-                        {todaysAppointments.map((appointment) => (
-                            <div key={appointment._id} className="border rounded-lg p-4 bg-blue-50">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <h3 className="font-semibold">
-                                            {appointment.patient ? 
-                                                `${appointment.patient.firstName} ${appointment.patient.lastName}` : 
-                                                'Patient Name Not Available'
-                                            }
-                                        </h3>
-                                        <p className="text-gray-600">Date: {new Date(appointment.date).toLocaleDateString()}</p>
-                                        <p className="text-gray-600">Time: {appointment.startTime} - {appointment.endTime}</p>
-                                        <p className="text-gray-600">Status: {appointment.status || 'Scheduled'}</p>
-                                    </div>
-                                    {appointment.status === 'pending' && (
-                                        <button
-                                            onClick={() => handleApproveAppointment(appointment._id)}
-                                            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors"
-                                        >
-                                            Approve
-                                        </button>
-                                    )}
-                                </div>
+                <div className="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-100">
+                    <h2 className="text-2xl font-semibold mb-6 text-gray-800 pb-2 border-b">Doctor Profile</h2>
+                    {doctorProfile?.profile ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h3 className="font-semibold mb-2">Personal Information</h3>
+                                <p className="text-gray-600">Email: {doctorProfile.user?.email || 'N/A'}</p>
+                                <p className="text-gray-600">Specialization: {doctorProfile.profile?.specialization || 'N/A'}</p>
+                                <p className="text-gray-600">Experience: {doctorProfile.profile?.experience || 0} years</p>
+                                <p className="text-gray-600">Consultation Fee: ${doctorProfile.profile?.consultationFee || 0}</p>
                             </div>
-                        ))}
-                    </div>
-                ) : (
-                    <p className="text-gray-500">No appointments scheduled for today</p>
-                )}
-            </div>
-
-            {/* Queue Management */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-semibold">Queue Management</h2>
-                    <div className="text-sm text-gray-600">
-                        Hospital ID: {user.hospitalId}
-                    </div>
+                            <div>
+                                <h3 className="font-semibold mb-2">Qualifications</h3>
+                                {doctorProfile.profile?.qualifications?.length > 0 ? (
+                                    doctorProfile.profile.qualifications.map((qual, index) => (
+                                        <div key={qual._id || index} className="mb-2">
+                                            <p className="text-gray-600">Degree: {qual.degree || 'N/A'}</p>
+                                            <p className="text-gray-600">Institution: {qual.institution || 'N/A'}</p>
+                                            <p className="text-gray-600">Year: {qual.year || 'N/A'}</p>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-gray-500">No qualifications added</p>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="text-gray-500">Profile information not available</p>
+                    )}
                 </div>
-                
-                {/* Only show queue system if doctor ID and hospital ID are available */}
-                {user._id && user.hospitalId ? (
-                    <QueueSystem 
-                        doctorId={user._id}
-                        hospitalId={user.hospitalId}
-                        role="doctor"
-                    />
-                ) : (
-                    <div className="text-red-500">
-                        Missing required information for queue management
-                    </div>
-                )}
-            </div>
 
-            {/* All Appointments Section */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-semibold mb-4">All Appointments</h2>
-                {doctorProfile?.profile?.appointments?.length > 0 ? (
-                    <div className="space-y-4">
-                        {doctorProfile.profile.appointments
-                            .sort((a, b) => new Date(b.date) - new Date(a.date)) // Sort by date, newest first
-                            .map((appointment) => (
-                            <div key={appointment._id} className="border rounded-lg p-4">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <h3 className="font-semibold">
-                                            {appointment.patient ? 
-                                                `${appointment.patient.firstName} ${appointment.patient.lastName}` : 
-                                                'Patient Name Not Available'
-                                            }
-                                        </h3>
-                                        <p className="text-gray-600">Date: {new Date(appointment.date).toLocaleDateString()}</p>
-                                        <p className="text-gray-600">Time: {appointment.startTime} - {appointment.endTime}</p>
-                                        <p className="text-gray-600">Status: 
-                                            <span className={`ml-1 px-2 py-1 rounded text-xs ${
-                                                appointment.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                                appointment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                                appointment.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                                                'bg-gray-100 text-gray-800'
-                                            }`}>
-                                                {appointment.status || 'Scheduled'}
-                                            </span>
-                                        </p>
-                                        {appointment.reason && (
-                                            <p className="text-gray-600">Reason: {appointment.reason}</p>
-                                        )}
-                                    </div>
-                                    <div className="flex gap-2">
+                <div className="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-100">
+                    <h2 className="text-2xl font-semibold mb-6 text-gray-800 pb-2 border-b">Today's Appointments</h2>
+                    {todaysAppointments.length > 0 ? (
+                        <div className="space-y-4">
+                            {todaysAppointments.map((appointment) => (
+                                <div key={appointment._id} className="border rounded-lg p-6 bg-gradient-to-r from-blue-50 to-white shadow-sm hover:shadow-md transition-shadow duration-200">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h3 className="font-semibold">
+                                                {appointment.patient ? 
+                                                    `${appointment.patient.firstName} ${appointment.patient.lastName}` : 
+                                                    'Patient Name Not Available'
+                                                }
+                                            </h3>
+                                            <p className="text-gray-600">Date: {new Date(appointment.date).toLocaleDateString()}</p>
+                                            <p className="text-gray-600">Time: {appointment.startTime} - {appointment.endTime}</p>
+                                            <p className="text-gray-600">Status: {appointment.status || 'Scheduled'}</p>
+                                        </div>
                                         {appointment.status === 'pending' && (
                                             <button
                                                 onClick={() => handleApproveAppointment(appointment._id)}
@@ -290,15 +206,88 @@ const DoctorDashboard = () => {
                                                 Approve
                                             </button>
                                         )}
-                                        {/* You can add more action buttons here if needed */}
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-gray-500">No appointments scheduled for today</p>
+                    )}
+                </div>
+
+                <div className="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-100">
+                    <div className="flex justify-between items-center mb-6 pb-2 border-b">
+                        <h2 className="text-2xl font-semibold text-gray-800">Queue Management</h2>
+                        <div className="px-4 py-2 bg-gray-50 rounded-full">
+                            <span className="text-sm font-medium text-gray-600">
+                                Hospital ID: <span className="text-blue-600">{user.hospitalId}</span>
+                            </span>
+                        </div>
                     </div>
-                ) : (
-                    <p className="text-gray-500">No appointments scheduled</p>
-                )}
+                    
+                    {user._id && user.hospitalId ? (
+                        <QueueSystem 
+                            doctorId={user._id}
+                            hospitalId={user.hospitalId}
+                            role="doctor"
+                        />
+                    ) : (
+                        <div className="text-red-500">
+                            Missing required information for queue management
+                        </div>
+                    )}
+                </div>
+
+                <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100">
+                    <h2 className="text-2xl font-semibold mb-6 text-gray-800 pb-2 border-b">All Appointments</h2>
+                    {doctorProfile?.profile?.appointments?.length > 0 ? (
+                        <div className="space-y-4">
+                            {doctorProfile.profile.appointments
+                                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                                .map((appointment) => (
+                                    <div key={appointment._id} className="border rounded-lg p-6 hover:shadow-md transition-shadow duration-200">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h3 className="font-semibold">
+                                                    {appointment.patient ? 
+                                                        `${appointment.patient.firstName} ${appointment.patient.lastName}` : 
+                                                        'Patient Name Not Available'
+                                                    }
+                                                </h3>
+                                                <p className="text-gray-600">Date: {new Date(appointment.date).toLocaleDateString()}</p>
+                                                <p className="text-gray-600">Time: {appointment.startTime} - {appointment.endTime}</p>
+                                                <p className="text-gray-600">Status: 
+                                                    <span className={`ml-1 px-2 py-1 rounded text-xs ${
+                                                        appointment.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                                        appointment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                                        appointment.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                                        'bg-gray-100 text-gray-800'
+                                                    }`}>
+                                                        {appointment.status || 'Scheduled'}
+                                                    </span>
+                                                </p>
+                                                {appointment.reason && (
+                                                    <p className="text-gray-600">Reason: {appointment.reason}</p>
+                                                )}
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {appointment.status === 'pending' && (
+                                                    <button
+                                                        onClick={() => handleApproveAppointment(appointment._id)}
+                                                        className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors"
+                                                    >
+                                                        Approve
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                        </div>
+                    ) : (
+                        <p className="text-gray-500">No appointments scheduled</p>
+                    )}
+                </div>
             </div>
         </div>
     );
