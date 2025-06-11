@@ -43,6 +43,14 @@ const VideoCall = ({
         };
     }, [isActive, loading, Peer]);
 
+    // Handle remote user ID changes
+    useEffect(() => {
+        if (isActive && localStream && remoteUserId && Peer && !peerRef.current) {
+            console.log('Creating peer connection for:', { isInitiator, remoteUserId });
+            createPeer(isInitiator);
+        }
+    }, [isActive, localStream, remoteUserId, isInitiator, Peer]);
+
     const startLocalStream = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -57,9 +65,7 @@ const VideoCall = ({
                 localVideoRef.current.srcObject = stream;
             }
             
-            if (isInitiator) {
-                createPeer(true);
-            }
+            console.log('Local stream started');
         } catch (error) {
             console.error('Error accessing media devices:', error);
             toast.error('Could not access camera/microphone');
@@ -67,7 +73,12 @@ const VideoCall = ({
     };
 
     const createPeer = (initiator) => {
-        if (!localStream || !Peer) return;
+        if (!localStream || !Peer || !remoteUserId) {
+            console.log('Cannot create peer:', { localStream: !!localStream, Peer: !!Peer, remoteUserId });
+            return;
+        }
+
+        console.log('Creating peer with initiator:', initiator);
 
         const peer = new Peer({
             initiator,
@@ -76,7 +87,7 @@ const VideoCall = ({
         });
 
         peer.on('signal', (data) => {
-            console.log('Sending signal to remote peer');
+            console.log('Sending signal to remote peer:', remoteUserId);
             socket.emit('videoCallSignal', {
                 signal: data,
                 from: localUserId,
@@ -118,15 +129,23 @@ const VideoCall = ({
     };
 
     const handleSignal = (signal) => {
+        console.log('Handling signal:', signal);
+        
         if (peerRef.current) {
+            console.log('Signaling existing peer');
             peerRef.current.signal(signal);
-        } else {
+        } else if (localStream && remoteUserId) {
+            console.log('Creating new peer for signal');
             createPeer(false);
+            // Give the peer a moment to initialize
             setTimeout(() => {
                 if (peerRef.current) {
+                    console.log('Signaling new peer');
                     peerRef.current.signal(signal);
                 }
-            }, 100);
+            }, 200);
+        } else {
+            console.log('Cannot handle signal - missing stream or remote user');
         }
     };
 

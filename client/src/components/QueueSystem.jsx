@@ -192,52 +192,23 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
 
         const handleNewMessage = (data) => {
             console.log('New message received:', data);
-            setMessages(prev => [...prev, {
-                id: Date.now(),
-                sender: data.sender,
-                message: data.message,
-                timestamp: new Date().toLocaleTimeString()
-            }]);
+            if (data.sender !== user._id) {
+                setMessages(prev => [...prev, {
+                    id: Date.now(),
+                    sender: data.sender,
+                    message: data.message,
+                    timestamp: new Date().toLocaleTimeString()
+                }]);
+            }
         };
 
-        const handleRequestVideoCall = () => {
-            if (!isConnected) {
-                toast.error('Not connected to server');
-                return;
-            }
+        const handleVideoCallRequestReceived = (data) => {
+            console.log('Video call request received:', data);
+            toast.success('Video call request received - starting call...');
+            addToLog('Video call request received', 'info');
             
-            const remoteUserId = role === 'patient' ? doctorId : currentPatient;
-            
-            socket.emit('requestVideoCall', {
-                doctorId,
-                hospitalId,
-                patientId: role === 'patient' ? user._id : currentPatient
-            });
-            
-            // Start video call as initiator
-            setVideoCallData({
-                isActive: true,
-                isInitiator: true,
-                remoteUserId
-            });
-            
-            addToLog('Video call request sent', 'info');
-        };
-
-        const handleAcceptVideoCall = () => {
-            if (!isConnected) {
-                toast.error('Not connected to server');
-                return;
-            }
-            
-            const remoteUserId = role === 'patient' ? doctorId : currentPatient;
-            
-            socket.emit('videoCallResponse', {
-                doctorId,
-                hospitalId,
-                patientId: user._id,
-                accepted: true
-            });
+            // Get the correct remote user ID from the request data
+            const remoteUserId = role === 'patient' ? data.doctorId : data.patientId;
             
             // Start video call as receiver
             setVideoCallData({
@@ -246,49 +217,27 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                 remoteUserId
             });
             
-            addToLog('Video call accepted', 'success');
-        };
-
-        const handleDeclineVideoCall = () => {
-            if (!isConnected) {
-                toast.error('Not connected to server');
-                return;
-            }
-            
+            // Send acceptance response
             socket.emit('videoCallResponse', {
                 doctorId,
                 hospitalId,
                 patientId: user._id,
-                accepted: false
-            });
-            addToLog('Video call declined', 'info');
-        };
-
-        const handleEndVideoCall = () => {
-            if (!isConnected) {
-                toast.error('Not connected to server');
-                return;
-            }
-            
-            socket.emit('endVideoCall', {
-                doctorId,
-                hospitalId,
-                patientId: role === 'patient' ? user._id : currentPatient
+                accepted: true
             });
             
-            setVideoCallData({
-                isActive: false,
-                isInitiator: false,
-                remoteUserId: null
-            });
-            
-            addToLog('Video call ended', 'info');
+            addToLog('Video call accepted and started', 'success');
         };
 
         const handleVideoCallSignal = (data) => {
             console.log('Video call signal received:', data);
+            console.log('Current user ID:', user._id);
+            console.log('Available handlers:', window.videoCallHandlers);
+            
             if (window.videoCallHandlers && window.videoCallHandlers[user._id]) {
+                console.log('Calling signal handler for user:', user._id);
                 window.videoCallHandlers[user._id](data.signal);
+            } else {
+                console.log('No signal handler found for user:', user._id);
             }
         };
 
@@ -307,21 +256,16 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             toast.error(error);
         };
 
-        const handleVideoCallRequest = (data) => {
-            console.log('Video call request received:', data);
-            if (role === 'patient' && data.patientId === user._id) {
-                toast.success('Doctor is requesting a video call!');
-                addToLog('Video call request received', 'success');
-            }
-            if (role === 'doctor' && data.patientId === currentPatient) {
-                addToLog('Video call request sent', 'success');
-            }
-        };
-
         const handleVideoCallResponse = (data) => {
             console.log('Video call response received:', data);
             if (data.accepted) {
-                setIsVideoCallActive(true);
+                // Update video call data to show it's active
+                const remoteUserId = role === 'patient' ? data.doctorId : data.patientId;
+                setVideoCallData({
+                    isActive: true,
+                    isInitiator: false,
+                    remoteUserId
+                });
                 toast.success('Video call started!');
                 addToLog('Video call started', 'success');
             } else {
@@ -338,7 +282,7 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                 isInitiator: false,
                 remoteUserId: null
             });
-            toast.info('Video call ended');
+            toast.success('Video call ended');
             addToLog('Video call ended', 'info');
         };
 
@@ -357,7 +301,7 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
         socket.on('consultationComplete', handleConsultationComplete);
         socket.on('onlineModeToggle', handleOnlineModeToggle);
         socket.on('newMessage', handleNewMessage);
-        socket.on('videoCallRequest', handleVideoCallRequest);
+        socket.on('videoCallRequest', handleVideoCallRequestReceived);
         socket.on('videoCallResponse', handleVideoCallResponse);
         socket.on('videoCallEnded', handleVideoCallEnded);
         socket.on('videoCallSignal', handleVideoCallSignal);
@@ -373,13 +317,124 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             socket.off('consultationComplete', handleConsultationComplete);
             socket.off('onlineModeToggle', handleOnlineModeToggle);
             socket.off('newMessage', handleNewMessage);
-            socket.off('videoCallRequest', handleVideoCallRequest);
+            socket.off('videoCallRequest', handleVideoCallRequestReceived);
             socket.off('videoCallResponse', handleVideoCallResponse);
             socket.off('videoCallEnded', handleVideoCallEnded);
             socket.off('videoCallSignal', handleVideoCallSignal);
             socket.off('error', handleError);
         };
     }, [socket, doctorId, hospitalId, user._id, role]);
+
+    // Video call functions (moved outside useEffect for JSX access)
+    const handleRequestVideoCall = () => {
+        if (!isConnected) {
+            toast.error('Not connected to server');
+            return;
+        }
+        
+        // Determine the correct remote user ID based on role
+        let remoteUserId;
+        if (role === 'patient') {
+            remoteUserId = doctorId;
+        } else if (role === 'doctor') {
+            if (!currentPatient) {
+                toast.error('No patient in consultation to call');
+                return;
+            }
+            remoteUserId = currentPatient;
+        } else {
+            toast.error('Invalid role for video call');
+            return;
+        }
+        
+        socket.emit('requestVideoCall', {
+            doctorId,
+            hospitalId,
+            patientId: role === 'patient' ? user._id : currentPatient
+        });
+        
+        setVideoCallData({
+            isActive: true,
+            isInitiator: true,
+            remoteUserId
+        });
+        
+        addToLog('Video call request sent', 'info');
+    };
+
+    const handleAcceptVideoCall = () => {
+        if (!isConnected) {
+            toast.error('Not connected to server');
+            return;
+        }
+        
+        // Determine the correct remote user ID based on role
+        let remoteUserId;
+        if (role === 'patient') {
+            remoteUserId = doctorId;
+        } else if (role === 'doctor') {
+            if (!currentPatient) {
+                toast.error('No patient in consultation to call');
+                return;
+            }
+            remoteUserId = currentPatient;
+        } else {
+            toast.error('Invalid role for video call');
+            return;
+        }
+        
+        socket.emit('videoCallResponse', {
+            doctorId,
+            hospitalId,
+            patientId: user._id,
+            accepted: true
+        });
+        
+        // Start video call as receiver
+        setVideoCallData({
+            isActive: true,
+            isInitiator: false,
+            remoteUserId
+        });
+        
+        addToLog('Video call accepted', 'success');
+    };
+
+    const handleDeclineVideoCall = () => {
+        if (!isConnected) {
+            toast.error('Not connected to server');
+            return;
+        }
+        
+        socket.emit('videoCallResponse', {
+            doctorId,
+            hospitalId,
+            patientId: user._id,
+            accepted: false
+        });
+        addToLog('Video call declined', 'info');
+    };
+
+    const handleEndVideoCall = () => {
+        if (!isConnected) {
+            toast.error('Not connected to server');
+            return;
+        }
+        
+        socket.emit('endVideoCall', {
+            doctorId,
+            hospitalId,
+            patientId: role === 'patient' ? user._id : currentPatient
+        });
+        
+        setVideoCallData({
+            isActive: false,
+            isInitiator: false,
+            remoteUserId: null
+        });
+        
+        addToLog('Video call ended', 'info');
+    };
 
     // Validation check
     if (!doctorId || !hospitalId) {
@@ -806,48 +861,11 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                 <div className="bg-white rounded-lg border p-6">
                     <h3 className="text-lg font-semibold mb-4">Online Consultation</h3>
                     
-                    {/* Video Call Interface */}
-                    {isVideoCallActive && (
-                        <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
-                            <h4 className="font-medium mb-3">Video Call</h4>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-black rounded-lg aspect-video flex items-center justify-center">
-                                    <div className="text-white text-center">
-                                        <div className="w-16 h-16 bg-gray-600 rounded-full mx-auto mb-2 flex items-center justify-center">
-                                            <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                                            </svg>
-                                        </div>
-                                        <p className="text-sm">You</p>
-                                    </div>
-                                </div>
-                                <div className="bg-black rounded-lg aspect-video flex items-center justify-center">
-                                    <div className="text-white text-center">
-                                        <div className="w-16 h-16 bg-gray-600 rounded-full mx-auto mb-2 flex items-center justify-center">
-                                            <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                                            </svg>
-                                        </div>
-                                        <p className="text-sm">{role === 'patient' ? 'Doctor' : 'Patient'}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex justify-center mt-4">
-                                <button
-                                    onClick={handleEndVideoCall}
-                                    className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors"
-                                >
-                                    End Call
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                    
                     {/* Video Call Controls */}
                     <div className="mb-6">
                         <h4 className="font-medium mb-3">Video Call</h4>
                         <div className="flex gap-3">
-                            {!isVideoCallActive ? (
+                            {!videoCallData.isActive ? (
                                 <>
                                     <button
                                         onClick={handleRequestVideoCall}
@@ -881,7 +899,7 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                                 </button>
                             )}
                         </div>
-                        {isVideoCallActive && (
+                        {videoCallData.isActive && (
                             <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
                                 <div className="flex items-center gap-2">
                                     <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
