@@ -6,7 +6,6 @@ const ChatWidget = () => {
     const [loading, setLoading] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
-    const [aiMode, setAiMode] = useState(false);
 
     const questionCategories = [
         {
@@ -56,11 +55,12 @@ const ChatWidget = () => {
             setMessages(prev => [...prev, { type: 'user', text: userMessage }]);
             setInput('');
 
-            // Use the correct API URL
+            // Use production API URL
             const baseUrl = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com';
             const apiUrl = `${baseUrl}/api/chat`;
             
-            console.log('Making request to:', apiUrl);
+            console.log('Sending chat request to:', apiUrl);
+            console.log('Request payload:', { message: userMessage });
             
             const response = await fetch(apiUrl, {
                 method: 'POST',
@@ -71,18 +71,23 @@ const ChatWidget = () => {
             });
 
             console.log('Response status:', response.status);
-            console.log('Response headers:', response.headers);
+            console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
             // Handle non-JSON responses
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
                 const text = await response.text();
-                console.log('Non-JSON response:', text);
+                console.error('Non-JSON response:', text);
                 throw new Error(`Server returned non-JSON response: ${response.status} ${response.statusText}`);
             }
 
             const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Failed to get response');
+            console.log('Response data:', data);
+            
+            if (!response.ok) {
+                console.error('API Error:', data);
+                throw new Error(data.error || data.details || 'Failed to get response');
+            }
 
             setMessages(prev => [...prev, { type: 'bot', text: data.response }]);
         } catch (error) {
@@ -90,68 +95,6 @@ const ChatWidget = () => {
             setMessages(prev => [...prev, { 
                 type: 'error', 
                 text: `Error: ${error.message || 'Failed to process your message. Please try again.'}`
-            }]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleAiAnalysis = async () => {
-        if (!input.trim()) {
-            setMessages(prev => [...prev, { 
-                type: 'error', 
-                text: 'Please enter a question or upload an image for AI analysis.' 
-            }]);
-            return;
-        }
-
-        try {
-            setLoading(true);
-            const userMessage = input.trim();
-            setMessages(prev => [...prev, { type: 'user', text: `🤖 AI Analysis: ${userMessage}` }]);
-            setInput('');
-
-            // Enhanced AI prompt for medical analysis
-            const enhancedPrompt = `As a medical AI assistant, please provide a comprehensive analysis of the following: "${userMessage}". 
-            Please include:
-            1. Key medical insights
-            2. Potential implications
-            3. Recommended next steps
-            4. Important considerations
-            Please be thorough but easy to understand.`;
-
-            const baseUrl = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com';
-            const apiUrl = `${baseUrl}/api/chat`;
-            
-            console.log('Making AI request to:', apiUrl);
-            
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ message: enhancedPrompt }),
-            });
-
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                const text = await response.text();
-                throw new Error(`Server returned non-JSON response: ${response.status} ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Failed to get AI analysis');
-
-            setMessages(prev => [...prev, { 
-                type: 'bot', 
-                text: `🤖 **AI Analysis:**\n\n${data.response}`,
-                isAiResponse: true
-            }]);
-        } catch (error) {
-            console.error('AI analysis error:', error);
-            setMessages(prev => [...prev, { 
-                type: 'error', 
-                text: `AI Analysis Error: ${error.message || 'Failed to get AI analysis. Please try again.'}` 
             }]);
         } finally {
             setLoading(false);
@@ -187,13 +130,16 @@ const ChatWidget = () => {
                 const base64Image = reader.result.split(',')[1];
                 setMessages(prev => [...prev, { 
                     type: 'user', 
-                    text: '📷 Analyzing uploaded medical image...', 
+                    text: 'Analyzing uploaded image...', 
                     image: reader.result 
                 }]);
 
-                // Fix URL construction to avoid duplicate "/api"
+                // Use production API URL
                 const baseUrl = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com';
-                const apiUrl = baseUrl.endsWith('/api') ? `${baseUrl}/analyze-image` : `${baseUrl}/api/analyze-image`;
+                const apiUrl = `${baseUrl}/api/analyze-image`;
+                
+                console.log('Sending image analysis request to:', apiUrl);
+                console.log('Image data length:', base64Image.length);
                 
                 const response = await fetch(apiUrl, {
                     method: 'POST',
@@ -203,21 +149,28 @@ const ChatWidget = () => {
                     body: JSON.stringify({ image: base64Image }),
                 });
 
+                console.log('Image analysis response status:', response.status);
+
                 // Handle non-JSON responses
                 const contentType = response.headers.get('content-type');
                 if (!contentType || !contentType.includes('application/json')) {
                     const text = await response.text();
+                    console.error('Non-JSON response:', text);
                     throw new Error(`Server returned non-JSON response: ${response.status} ${response.statusText}`);
                 }
 
                 const data = await response.json();
-                if (!response.ok) throw new Error(data.error || 'Failed to analyze image');
+                console.log('Image analysis response data:', data);
+                
+                if (!response.ok) {
+                    console.error('Image analysis API Error:', data);
+                    throw new Error(data.error || data.details || 'Failed to analyze image');
+                }
 
                 setMessages(prev => [...prev, {
                     type: 'bot',
-                    text: `🤖 **AI Image Analysis:**\n\n${data.analysis}`,
-                    extractedText: data.text,
-                    isAiResponse: true
+                    text: data.analysis,
+                    extractedText: data.text
                 }]);
             };
 
@@ -369,8 +322,6 @@ const ChatWidget = () => {
                                     ? 'bg-blue-600 text-white'
                                     : msg.type === 'error'
                                     ? 'bg-red-100 text-red-600'
-                                    : msg.isAiResponse
-                                    ? 'bg-gradient-to-r from-purple-50 to-blue-50 text-gray-800 border-2 border-purple-200'
                                     : 'bg-gray-100 text-gray-800'
                             }`}
                         >
@@ -389,14 +340,7 @@ const ChatWidget = () => {
                                     <p>{msg.extractedText}</p>
                                 </div>
                             )}
-                            <div className={`${msg.isAiResponse ? 'whitespace-pre-wrap' : ''}`}>
-                                {msg.text}
-                            </div>
-                            {msg.isAiResponse && (
-                                <div className="mt-2 text-xs text-purple-600 font-medium">
-                                    🤖 AI-Powered Analysis
-                                </div>
-                            )}
+                            {msg.text}
                         </div>
                     </div>
                     ))
@@ -431,35 +375,20 @@ const ChatWidget = () => {
                         >
                             Send
                         </button>
-                        <button
-                            type="button"
-                            onClick={handleAiAnalysis}
-                            disabled={loading || !input.trim()}
-                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 flex items-center space-x-1"
-                            title="Get AI-powered analysis"
-                        >
-                            <span>🤖</span>
-                            <span className="hidden sm:inline">AI</span>
-                        </button>
                     </div>
-                    <div className="flex items-center justify-between">
-                        <label className="flex items-center space-x-2 cursor-pointer px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 text-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span>Upload Medical Report</span>
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleImageUpload}
-                                className="hidden"
-                                disabled={loading}
-                            />
-                        </label>
-                        <div className="text-xs text-gray-500">
-                            Powered by AI 🤖
-                        </div>
-                    </div>
+                    <label className="flex items-center space-x-2 cursor-pointer px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span>Upload Medical Report</span>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                            disabled={loading}
+                        />
+                    </label>
                 </div>
             </form>
         </div>
