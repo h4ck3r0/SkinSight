@@ -233,11 +233,22 @@ export async function approveAppointment(req, res) {
         const appointmentId = req.params.appointmentId;
         console.log("Approving appointment:", appointmentId);
 
+        const { approvalStatus, approvalMessage } = req.body;
+        console.log("Request body:", req.body);
+        
+        if (!approvalStatus || !['approved', 'rejected'].includes(approvalStatus)) {
+            return res.status(400).json({ 
+                message: "Invalid approval status. Must be either 'approved' or 'rejected'" 
+            });
+        }
+
         const appointment = await Appointment.findByIdAndUpdate(
             appointmentId,
-            { 
-                status: "confirmed",
-                approvalStatus: "approved"
+            {
+                approvalStatus,
+                approvalMessage: approvalMessage || "",
+                approverBy: req.user._id,
+                status: approvalStatus === 'approved' ? 'confirmed' : 'cancelled'
             },
             { new: true }
         );
@@ -247,7 +258,7 @@ export async function approveAppointment(req, res) {
         }
 
         res.status(200).json({ 
-            message: "Appointment approved successfully",
+            message: `Appointment ${approvalStatus} successfully`,
             appointment 
         });
     } catch (err) {

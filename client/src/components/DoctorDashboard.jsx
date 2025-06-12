@@ -114,7 +114,7 @@ const DoctorDashboard = () => {
     const handleApproveAppointment = async (appointmentId) => {
         try {
             const API_URL = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com/api';
-            await axios.put(`${API_URL}/appointments/${appointmentId}/approve`, {
+            await axios.put(`${API_URL}/doctors/appointments/${appointmentId}/approve`, {
                 approvalStatus: 'approved',
                 approvalMessage: 'Appointment approved by doctor'
             }, {
@@ -133,7 +133,7 @@ const DoctorDashboard = () => {
     const handleRejectAppointment = async (appointmentId) => {
         try {
             const API_URL = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com/api';
-            await axios.put(`${API_URL}/appointments/${appointmentId}/approve`, {
+            await axios.put(`${API_URL}/doctors/appointments/${appointmentId}/approve`, {
                 approvalStatus: 'rejected',
                 approvalMessage: 'Appointment rejected by doctor'
             }, {
