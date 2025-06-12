@@ -47,8 +47,14 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
     useEffect(() => {
         console.log('QueueSystem Props:', { doctorId, hospitalId, role });
         console.log('User:', user);
+        console.log('Doctor ID type:', typeof doctorId);
+        console.log('Doctor ID value:', doctorId);
+        console.log('Hospital ID type:', typeof hospitalId);
+        console.log('Hospital ID value:', hospitalId);
+        console.log('Socket connection status:', socket?.connected);
+        console.log('Socket ID:', socket?.id);
         addToLog(`QueueSystem initialized for ${role}`, 'info');
-    }, [doctorId, hospitalId, role, user]);
+    }, [doctorId, hospitalId, role, user, socket]);
 
     useEffect(() => {
         if (!socket) {
@@ -62,15 +68,21 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             addToLog('Connected to server', 'success');
             
             // Join user's room using MongoDB user ID (long ID)
-            if (user._id) {
+            if (user && user._id) {
                 socket.emit('joinRoom', user._id);
                 addToLog(`Joined user room with MongoDB ID: ${user._id}`, 'info');
+            } else {
+                console.error('User ID not available for room joining');
+                addToLog('User ID not available for room joining', 'error');
             }
             
             // Get initial queue status
             if (doctorId && hospitalId) {
                 socket.emit('getQueueStatus', { doctorId, hospitalId });
                 addToLog('Requesting initial queue status', 'info');
+            } else {
+                console.error('Doctor ID or Hospital ID not available for queue status');
+                addToLog('Doctor ID or Hospital ID not available for queue status', 'error');
             }
         };
 
@@ -91,7 +103,7 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
 
         const handlePositionUpdate = (data) => {
             console.log('Position update received:', data);
-            if (role === 'patient' && data.patientId === user._id) {
+            if (role === 'patient' && user && data.patientId === user._id) {
                 setCurrentPosition(data.position);
                 setEstimatedWaitTime(data.estimatedWaitTime);
                 addToLog(`Position updated: ${data.position}`, 'info');
@@ -101,10 +113,10 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
         const handlePatientCalled = (data) => {
             console.log('Patient called:', data);
             console.log('Current role:', role);
-            console.log('Current user ID:', user._id);
+            console.log('Current user ID:', user?._id);
             console.log('Data patient ID:', data.patientId);
             
-            if (role === 'patient' && data.patientId === user._id) {
+            if (role === 'patient' && user && data.patientId === user._id) {
                 console.log('Patient entering consultation mode');
                 toast.success('You are being called by the doctor!');
                 setIsInQueue(false);
@@ -122,7 +134,7 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
 
         const handleConsultationComplete = (data) => {
             console.log('Consultation complete:', data);
-            if (role === 'patient' && data.patientId === user._id) {
+            if (role === 'patient' && user && data.patientId === user._id) {
                 console.log('Patient leaving consultation mode');
                 setIsInConsultation(false);
                 setIsOnlineMode(false);
@@ -147,14 +159,14 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
         const handleOnlineModeToggle = (data) => {
             console.log('Online mode toggle received:', {
                 role,
-                user_id: user._id,
+                user_id: user?._id,
                 currentPatient,
                 patientId: data.patientId,
                 newOnlineMode: data.isOnline,
                 isInConsultation
             });
             
-            if (role === 'patient' && data.patientId === user._id) {
+            if (role === 'patient' && user && data.patientId === user._id) {
                 console.log('Patient handling online mode toggle');
                 setIsOnlineMode(data.isOnline);
                 if (data.isOnline) {
@@ -198,13 +210,25 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
 
         const handleNewMessage = (data) => {
             console.log('New message received:', data);
-            if (data.sender !== user._id) {
-                setMessages(prev => [...prev, {
-                    id: Date.now(),
-                    sender: data.sender,
-                    message: data.message,
-                    timestamp: new Date().toLocaleTimeString()
-                }]);
+            console.log('Current user ID:', user?._id);
+            console.log('Message sender:', data.sender);
+            console.log('Is own message:', data.sender === user?._id);
+            
+            if (user && data.sender !== user._id) {
+                console.log('Adding message to local state');
+                setMessages(prev => {
+                    const newMessages = [...prev, {
+                        id: Date.now(),
+                        sender: data.sender,
+                        message: data.message,
+                        timestamp: new Date().toLocaleTimeString()
+                    }];
+                    console.log('Updated messages array:', newMessages);
+                    return newMessages;
+                });
+                addToLog('Message received', 'info');
+            } else {
+                console.log('Ignoring own message or no user available');
             }
         };
 
@@ -255,19 +279,46 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             console.log('Current user ID:', user._id);
             console.log('Available handlers:', window.videoCallHandlers);
             
-            if (window.videoCallHandlers && window.videoCallHandlers[user._id]) {
-                console.log('Calling signal handler for user:', user._id);
-                try {
-                    window.videoCallHandlers[user._id](data.signal);
-                } catch (error) {
-                    console.error('Error in signal handler:', error);
-                    if (error.message.includes('destroyed')) {
-                        console.log('Peer was destroyed, removing handler');
-                        delete window.videoCallHandlers[user._id];
-                    }
+            try {
+                if (!data || !data.signal) {
+                    console.error('Invalid signal data received:', data);
+                    addToLog('Invalid video call signal data', 'error');
+                    return;
                 }
-            } else {
-                console.log('No signal handler found for user:', user._id);
+                
+                if (!user || !user._id) {
+                    console.error('User not available for signal handling');
+                    addToLog('User not available for video call signal', 'error');
+                    return;
+                }
+                
+                if (window.videoCallHandlers && window.videoCallHandlers[user._id]) {
+                    console.log('Calling signal handler for user:', user._id);
+                    try {
+                        window.videoCallHandlers[user._id](data.signal);
+                    } catch (handlerError) {
+                        console.error('Error in signal handler:', handlerError);
+                        
+                        // Handle specific error types
+                        if (handlerError && handlerError.message && handlerError.message.includes('destroyed')) {
+                            console.log('Peer was destroyed, removing handler');
+                            if (window.videoCallHandlers && window.videoCallHandlers[user._id]) {
+                                delete window.videoCallHandlers[user._id];
+                            }
+                        } else {
+                            // Log other errors but don't remove handler
+                            console.error('Signal handler error:', handlerError);
+                            const errorMsg = handlerError?.message || 'Unknown signal handler error';
+                            addToLog(`Signal error: ${errorMsg}`, 'error');
+                        }
+                    }
+                } else {
+                    console.log('No signal handler found for user:', user._id);
+                    addToLog('No video call handler available', 'warning');
+                }
+            } catch (error) {
+                console.error('Unexpected error in handleVideoCallSignal:', error);
+                addToLog('Unexpected video call signal error', 'error');
             }
         };
 
@@ -281,9 +332,35 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
         };
 
         const handleError = (error) => {
-            console.error('Socket error:', error);
-            addToLog(`Error: ${error}`, 'error');
-            toast.error(error);
+            console.error('Socket error received:', error);
+            
+            // Handle different types of error objects
+            let errorMessage = 'Unknown socket error';
+            
+            try {
+                if (typeof error === 'string') {
+                    errorMessage = error;
+                } else if (error && typeof error === 'object') {
+                    if (error.message) {
+                        errorMessage = error.message;
+                    } else if (error.toString && typeof error.toString === 'function') {
+                        errorMessage = error.toString();
+                    } else if (error.name) {
+                        errorMessage = `${error.name}: ${error.message || 'Unknown error'}`;
+                    } else {
+                        errorMessage = JSON.stringify(error);
+                    }
+                } else if (error !== null && error !== undefined) {
+                    errorMessage = String(error);
+                }
+            } catch (parseError) {
+                console.error('Error parsing socket error:', parseError);
+                errorMessage = 'Socket communication error';
+            }
+            
+            console.log('Processed error message:', errorMessage);
+            addToLog(`Error: ${errorMessage}`, 'error');
+            toast.error(errorMessage);
         };
 
         const handleVideoCallResponse = (data) => {
@@ -364,6 +441,11 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             return;
         }
         
+        if (!user || !user._id) {
+            toast.error('User not available for video call');
+            return;
+        }
+        
         if (isVideoCallStateChanging) {
             console.log('Video call state is changing, ignoring request');
             return;
@@ -413,6 +495,11 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             return;
         }
         
+        if (!user || !user._id) {
+            toast.error('User not available for video call');
+            return;
+        }
+        
         // Determine the correct remote user ID based on role
         let remoteUserId;
         if (role === 'patient') {
@@ -448,6 +535,11 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
     const handleDeclineVideoCall = () => {
         if (!isConnected) {
             toast.error('Not connected to server');
+            return;
+        }
+        
+        if (!user || !user._id) {
+            toast.error('User not available for video call');
             return;
         }
         
@@ -504,6 +596,11 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
             return;
         }
         
+        if (!user || !user._id) {
+            toast.error('User not available to join queue');
+            return;
+        }
+        
         socket.emit('joinQueue', {
             doctorId,
             hospitalId,
@@ -516,6 +613,11 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
     const handleLeaveQueue = () => {
         if (!isConnected) {
             toast.error('Not connected to server');
+            return;
+        }
+        
+        if (!user || !user._id) {
+            toast.error('User not available to leave queue');
             return;
         }
         
@@ -618,13 +720,37 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
         e.preventDefault();
         if (!newMessage.trim() || !isConnected) return;
         
+        if (!user || !user._id) {
+            toast.error('User not available to send message');
+            return;
+        }
+        
+        console.log('Sending message:', {
+            message: newMessage.trim(),
+            sender: user._id,
+            receiver: role === 'patient' ? doctorId : currentPatient,
+            role: role
+        });
+        
         const messageData = {
             doctorId,
             hospitalId,
-            sender: role === 'patient' ? user._id : currentPatient,
-            receiver: role === 'patient' ? doctorId : user._id,
+            sender: user._id, // Always use current user as sender
+            receiver: role === 'patient' ? doctorId : currentPatient, // Receiver is the other person
             message: newMessage.trim()
         };
+        
+        // Add message to local messages array immediately for instant feedback
+        setMessages(prev => {
+            const newMessages = [...prev, {
+                id: Date.now(),
+                sender: user._id,
+                message: newMessage.trim(),
+                timestamp: new Date().toLocaleTimeString()
+            }];
+            console.log('Added message to local state:', newMessages);
+            return newMessages;
+        });
         
         socket.emit('sendMessage', messageData);
         setNewMessage('');
@@ -644,6 +770,10 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                     </div>
                     <div className="text-xs text-gray-500">
                         Role: {role} | Doctor: {typeof doctorId === 'string' ? doctorId?.slice(-8) : 'Invalid ID'} | Hospital: {typeof hospitalId === 'string' ? hospitalId?.slice(-8) : 'Invalid ID'}
+                        <br />
+                        <span className="text-xs text-gray-400">
+                            Full Doctor ID: {doctorId} | Full Hospital ID: {hospitalId}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -765,6 +895,18 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                         className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 transition-colors"
                     >
                         Refresh Status
+                    </button>
+                    <button
+                        onClick={() => {
+                            console.log('Testing socket connection...');
+                            console.log('Socket connected:', socket?.connected);
+                            console.log('Socket ID:', socket?.id);
+                            console.log('Socket transport:', socket?.io?.engine?.transport?.name);
+                            addToLog(`Socket test - Connected: ${socket?.connected}, ID: ${socket?.id?.slice(-4)}`, 'info');
+                        }}
+                        className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                    >
+                        Test Connection
                     </button>
                 </div>
             </div>
@@ -962,12 +1104,17 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                     <div className="mb-4">
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="font-medium">Chat</h4>
-                            <button
-                                onClick={() => setShowChat(!showChat)}
-                                className="text-blue-500 hover:text-blue-600 text-sm"
-                            >
-                                {showChat ? 'Hide Chat' : 'Show Chat'}
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-500">
+                                    Messages: {messages.length} | User: {user?._id?.slice(-8)} | Role: {role}
+                                </span>
+                                <button
+                                    onClick={() => setShowChat(!showChat)}
+                                    className="text-blue-500 hover:text-blue-600 text-sm"
+                                >
+                                    {showChat ? 'Hide Chat' : 'Show Chat'}
+                                </button>
+                            </div>
                         </div>
                         
                         {showChat && (
@@ -977,27 +1124,26 @@ const QueueSystem = ({ doctorId, hospitalId, role }) => {
                                     {messages.length === 0 ? (
                                         <p className="text-gray-500 text-center">No messages yet. Start the conversation!</p>
                                     ) : (
-                                        messages.map((msg) => (
-                                            <div
-                                                key={msg.id}
-                                                className={`mb-3 ${
-                                                    msg.sender === (role === 'patient' ? user._id : currentPatient)
-                                                        ? 'text-right'
-                                                        : 'text-left'
-                                                }`}
-                                            >
+                                        messages.map((msg) => {
+                                            const isOwnMessage = msg.sender === user._id;
+                                            return (
                                                 <div
-                                                    className={`inline-block max-w-xs px-3 py-2 rounded-lg ${
-                                                        msg.sender === (role === 'patient' ? user._id : currentPatient)
-                                                            ? 'bg-blue-500 text-white'
-                                                            : 'bg-white text-gray-800 border'
-                                                    }`}
+                                                    key={msg.id}
+                                                    className={`mb-3 ${isOwnMessage ? 'text-right' : 'text-left'}`}
                                                 >
-                                                    <p className="text-sm">{msg.message}</p>
-                                                    <p className="text-xs opacity-75 mt-1">{msg.timestamp}</p>
+                                                    <div
+                                                        className={`inline-block max-w-xs px-3 py-2 rounded-lg ${
+                                                            isOwnMessage
+                                                                ? 'bg-blue-500 text-white'
+                                                                : 'bg-white text-gray-800 border'
+                                                        }`}
+                                                    >
+                                                        <p className="text-sm">{msg.message}</p>
+                                                        <p className="text-xs opacity-75 mt-1">{msg.timestamp}</p>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))
+                                            );
+                                        })
                                     )}
                                 </div>
                                 

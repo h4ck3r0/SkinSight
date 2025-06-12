@@ -75,6 +75,11 @@ export const SetupSocket = (server) => {
     io.on('connection', (socket) => {
         console.log('Client connected:', socket.id);
 
+        // General error handler for this socket
+        socket.on('error', (error) => {
+            console.error('Socket error for client', socket.id, ':', error);
+        });
+
         socket.on('joinRoom', (userId) => {
             socket.join(userId);
             console.log(`User ${userId} (MongoDB ID) joined their room`);
@@ -89,7 +94,7 @@ export const SetupSocket = (server) => {
                         position,
                         estimatedWaitTime: position * 15 
                     });
-e
+
                     io.to(doctorId).emit('queueUpdate', {
                         doctorId,
                         hospitalId,
@@ -98,7 +103,9 @@ e
                     });
                 }
             } catch (error) {
-                socket.emit('error', error.message);
+                console.error('Error in joinQueue:', error);
+                const errorMessage = error?.message || 'Failed to join queue';
+                socket.emit('error', errorMessage);
             }
         });
 
@@ -245,12 +252,20 @@ e
 
         // WebRTC signal handling
         socket.on('videoCallSignal', ({ signal, from, to }) => {
-            console.log(`Relaying video call signal from ${from} to ${to}`);
-            io.to(to).emit('videoCallSignal', {
-                signal,
-                from,
-                to
-            });
+            try {
+                console.log(`Relaying video call signal from ${from} to ${to}`);
+                if (!signal || !from || !to) {
+                    console.error('Invalid video call signal data:', { signal, from, to });
+                    return;
+                }
+                io.to(to).emit('videoCallSignal', {
+                    signal,
+                    from,
+                    to
+                });
+            } catch (error) {
+                console.error('Error handling video call signal:', error);
+            }
         });
 
         socket.on('disconnect', () => {

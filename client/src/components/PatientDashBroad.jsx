@@ -3,6 +3,7 @@ import { useGeolocation } from "../hooks/useGeolocation";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import QueueSystem from "./QueueSystem";
+import Navigation from "./Navigation";
 import { toast } from "react-hot-toast";
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com/api';
@@ -143,15 +144,43 @@ const PatientDashBroad = () => {
     };
 
     const handleJoinQueue = (hospital, doctor) => {
+        console.log('handleJoinQueue called with:', { hospital, doctor });
+        
+        // Get the correct doctor ID - use user._id if available, otherwise fallback to doctor._id
+        const doctorId = doctor.user?._id || doctor._id;
+        console.log('Doctor ID (user):', doctor.user?._id);
+        console.log('Doctor ID (profile):', doctor._id);
+        console.log('Using Doctor ID:', doctorId);
+        console.log('Hospital ID:', hospital._id);
+        
+        if (!doctorId) {
+            toast.error('Doctor ID is missing. Please try again.');
+            return;
+        }
+        
+        if (!hospital._id) {
+            toast.error('Hospital ID is missing. Please try again.');
+            return;
+        }
+        
+        // Create a modified doctor object with the correct ID
+        const doctorWithCorrectId = {
+            ...doctor,
+            _id: doctorId // Use the user ID for queue operations
+        };
+        
         setSelectedHospital(hospital);
-        setSelectedDoctor(doctor);
+        setSelectedDoctor(doctorWithCorrectId);
         setActiveTab('queue');
     };
 
     const handleAppointmentSubmit = async (e) => {
         e.preventDefault();
         
-        if (!selectedDoctor?._id || !selectedHospital?._id) {
+        // Get the correct doctor ID - use user._id if available, otherwise fallback to doctor._id
+        const doctorId = selectedDoctor.user?._id || selectedDoctor._id;
+        
+        if (!doctorId || !selectedHospital?._id) {
             toast.error("Please select a doctor and hospital");
             return;
         }
@@ -169,7 +198,7 @@ const PatientDashBroad = () => {
             const response = await axios.post(
                 `${API_URL}/appointments/create`,
                 {
-                    doctor: selectedDoctor._id,
+                    doctor: doctorId, // Use the correct doctor ID
                     patient: user._id,
                     hospital: selectedHospital._id,
                     appointmentDate,
@@ -198,16 +227,7 @@ const PatientDashBroad = () => {
         } catch (err) {
             console.error("Error creating appointment:", err);
             const errorMessage = err.response?.data?.message || "Failed to create appointment";
-            
-            // Handle specific error for unavailable time slot
-            if (err.response?.data?.nextAvailableSlot) {
-                const nextSlot = err.response.data.nextAvailableSlot;
-                toast.error(`${errorMessage}. Next available slot: ${new Date(nextSlot.date).toLocaleDateString()} at ${nextSlot.startTime}`);
-            } else {
-                toast.error(errorMessage);
-            }
-            
-            setError(errorMessage);
+            toast.error(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -215,437 +235,501 @@ const PatientDashBroad = () => {
 
     const fetchAppointments = async (userId) => {
         try {
-            setLoading(true);
             const token = localStorage.getItem('token');
-            const response = await axios.get(
-                `${API_URL}/appointments/patient/${userId}`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
+            const response = await axios.get(`${API_URL}/appointments/patient/${userId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
                 }
-            );
+            });
+            
             if (response.data && response.data.appointments) {
                 setAppointments(response.data.appointments);
-            } else {
-                setAppointments([]);
             }
         } catch (err) {
             console.error("Error fetching appointments:", err);
-            setError(err.response?.data?.message || "Failed to fetch appointments");
-        } finally {
-            setLoading(false);
         }
     };
 
-    // Enhanced hospital selection for queue
     const handleHospitalSelection = (hospitalId) => {
-        const hospital = allHospitalsList.find(h => h._id === hospitalId);
-        if (hospital) {
-            setSelectedHospital(hospital);
-            setSelectedDoctor(null);
-        }
+        navigate(`/hospital-selection/${hospitalId}`);
     };
 
-    // Combine both hospital lists for search
-    const allHospitalsList = [...hospitals, ...allhospitals];
-    
-    const filterHospitals = allHospitalsList.filter((hospital) => {
-        const term = searchedTerm.toLowerCase();
-        return (
-            (hospital.name && hospital.name.toLowerCase().includes(term)) ||
-            (hospital.address && hospital.address.toLowerCase().includes(term)) ||
-            (hospital.city && hospital.city.toLowerCase().includes(term)) ||
-            (hospital.state && hospital.state.toLowerCase().includes(term)) ||
-            (hospital.doctors && hospital.doctors.some(doctor => {
-                const firstName = doctor.user?.firstName || doctor.firstName || '';
-                const lastName = doctor.user?.lastName || doctor.lastName || '';
-                const doctorName = firstName + (lastName ? ` ${lastName}` : '');
-                return doctorName.toLowerCase().includes(term) || 
-                       (doctor.specialization && doctor.specialization.toLowerCase().includes(term));
-            }))
-        );
-    });
+    const filteredHospitals = searchedTerm
+        ? (isgetAll ? allhospitals : hospitals).filter(hospital =>
+            hospital.name.toLowerCase().includes(searchedTerm.toLowerCase()) ||
+            hospital.address.toLowerCase().includes(searchedTerm.toLowerCase())
+        )
+        : (isgetAll ? allhospitals : hospitals);
 
-    if (locationError) {
-        return (
-            <div className="min-h-screen bg-[#A6DCEF]/10 flex flex-col justify-center items-center">
-                <div className="bg-white rounded-lg shadow-md p-8 max-w-lg w-full">
-                    <h1 className="text-3xl font-bold mb-6 text-[#2C3E50] text-center">Patient Dashboard</h1>
-                    <div className="text-red-500 text-center">
-                        Error: {locationError}
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    const currentHospitals = isgetAll ? allhospitals : hospitals;
 
     return (
-        <div className="min-h-screen bg-[#A6DCEF]/10">
-            <div className="container mx-auto px-6 py-8">
-                <div className="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-100">
-                    <h1 className="text-3xl font-bold mb-6 text-[#2C3E50] pb-2 border-b border-[#A6DCEF]">Patient Dashboard</h1>
-                    
-                    {/* Tab navigation */}
-                    <nav className="flex space-x-6">
-                        <button
-                            onClick={() => setActiveTab('hospitals')}
-                            className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
-                                activeTab === 'hospitals'
-                                    ? 'bg-[#2C3E50] text-white shadow-md hover:opacity-90'
-                                    : 'text-[#2C3E50] hover:bg-[#A6DCEF]/10'
-                            }`}
-                        >
-                            Hospitals
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('appointments')}
-                            className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
-                                activeTab === 'appointments'
-                                    ? 'bg-[#2C3E50] text-white shadow-md hover:opacity-90'
-                                    : 'text-[#2C3E50] hover:bg-[#A6DCEF]/10'
-                            }`}
-                        >
-                            Appointments
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('queue')}
-                            className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
-                                activeTab === 'queue'
-                                    ? 'bg-[#2C3E50] text-white shadow-md hover:opacity-90'
-                                    : 'text-[#2C3E50] hover:bg-[#A6DCEF]/10'
-                            }`}
-                        >
-                            Queue Status
-                        </button>
-                    </nav>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+            <Navigation />
+            
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                {/* Header Section */}
+                <div className="mb-8">
+                    <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                                    Welcome back, {user?.name || 'Patient'}! 👋
+                                </h1>
+                                <p className="text-gray-600">
+                                    Find nearby hospitals, book appointments, and manage your healthcare needs.
+                                </p>
+                            </div>
+                            <div className="mt-4 md:mt-0">
+                                <div className="flex items-center space-x-2 text-sm text-gray-500">
+                                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                    <span>Location services active</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-            {activeTab === 'hospitals' ? (
-                <div className="space-y-6">
-                    <div className="max-w-7xl mx-auto">
-                        <div className="mb-8">
-                            <input 
-                                className="w-full px-6 py-3 rounded-lg text-[#2C3E50] border border-[#A6DCEF] focus:outline-none focus:ring-2 focus:ring-[#2C3E50] focus:border-transparent shadow-sm"
-                                placeholder="Search hospitals by name, address, city, state, or doctor..."
-                                value={searchedTerm}
-                                onChange={(e) => {
-                                    SetSearchedTerm(e.target.value);
-                                    setShowSearchResults(e.target.value.length > 0);
-                                }}
-                            />
+                {/* Quick Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+                        <div className="flex items-center">
+                            <div className="p-3 bg-blue-100 rounded-lg">
+                                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-medium text-gray-600">Nearby Hospitals</p>
+                                <p className="text-2xl font-bold text-gray-900">{hospitals.length}</p>
+                            </div>
                         </div>
-
-                        {loading && (
-                            <div className="text-center py-4">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
-                                <p className="mt-2">Loading hospitals...</p>
-                            </div>
-                        )}
-                        
-                        {error && (
-                            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
-                                {error}
-                            </div>
-                        )}
-
-                        {!loading && !error && (isgetAll ? allhospitals.length === 0 : hospitals.length === 0) && (
-                            <div className="text-center py-4">
-                                {isgetAll ? 'No hospitals found' : 'No hospitals found nearby'}
-                            </div>
-                        )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <>
-                        {(() => {
-                            const hospitalsToShow = showSearchResults ? filterHospitals : (isgetAll ? allhospitals : hospitals);
-                            console.log('Hospitals to show:', {
-                                showSearchResults,
-                                isgetAll,
-                                hospitalsCount: hospitals.length,
-                                allhospitalsCount: allhospitals.length,
-                                filterHospitalsCount: filterHospitals.length,
-                                hospitalsToShowCount: hospitalsToShow.length,
-                                hospitalsToShow
-                            });
-                            return hospitalsToShow.map((hospital) => (
-                                <div key={hospital._id} className="bg-white rounded-lg shadow-md p-6 border border-gray-100 hover:shadow-lg transition-shadow duration-200">
-                                    <h3 className="text-xl font-semibold mb-2 text-gray-800">{hospital.name}</h3>
-                                    <p className="text-gray-600 mb-2">{hospital.address}</p>
-                                    <p className="text-gray-600 mb-4">Phone: {hospital.phone}</p>
-                                    
-                                    {hospital.doctors && hospital.doctors.length > 0 ? (
-                                        <div className="mt-4">
-                                            <h4 className="font-medium mb-2 text-gray-800">Available Doctors:</h4>
-                                            <div className="space-y-3">
-                                                {hospital.doctors.map((doctor, index) => {
-                                                    // Handle different doctor data structures
-                                                    const firstName = doctor.user?.firstName || doctor.firstName || '';
-                                                    const lastName = doctor.user?.lastName || doctor.lastName || '';
-                                                    const doctorName = firstName + (lastName ? ` ${lastName}` : '');
-                                                    
-                                                    return (
-                                                        <div key={doctor._id || index} className="border border-gray-200 rounded-lg p-4 bg-gradient-to-r from-gray-50 to-white hover:shadow-md transition-all duration-200">
-                                                            <p className="font-medium text-gray-800">
-                                                                Dr. {doctorName || 'Unknown Doctor'}
+                    <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+                        <div className="flex items-center">
+                            <div className="p-3 bg-green-100 rounded-lg">
+                                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-medium text-gray-600">Your Appointments</p>
+                                <p className="text-2xl font-bold text-gray-900">{appointments.length}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+                        <div className="flex items-center">
+                            <div className="p-3 bg-purple-100 rounded-lg">
+                                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-medium text-gray-600">Available Doctors</p>
+                                <p className="text-2xl font-bold text-gray-900">
+                                    {Object.values(doctorsMap).flat().length}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Tab Navigation */}
+                <div className="bg-white rounded-xl shadow-lg border border-gray-100 mb-8">
+                    <div className="border-b border-gray-200">
+                        <nav className="flex space-x-8 px-6" aria-label="Tabs">
+                            <button
+                                onClick={() => setActiveTab('hospitals')}
+                                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                                    activeTab === 'hospitals'
+                                        ? 'border-blue-500 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                            >
+                                <div className="flex items-center space-x-2">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                    </svg>
+                                    <span>Hospitals</span>
+                                </div>
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('appointments')}
+                                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                                    activeTab === 'appointments'
+                                        ? 'border-blue-500 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                            >
+                                <div className="flex items-center space-x-2">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    <span>Appointments</span>
+                                </div>
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('queue')}
+                                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                                    activeTab === 'queue'
+                                        ? 'border-blue-500 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                            >
+                                <div className="flex items-center space-x-2">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                    <span>Queue</span>
+                                </div>
+                            </button>
+                        </nav>
+                    </div>
+
+                    <div className="p-6">
+                        {/* Search and Filter Section */}
+                        <div className="mb-6">
+                            <div className="flex flex-col sm:flex-row gap-4">
+                                <div className="flex-1">
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                            </svg>
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="Search hospitals..."
+                                            value={searchedTerm}
+                                            onChange={(e) => SetSearchedTerm(e.target.value)}
+                                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex space-x-2">
+                                    <button
+                                        onClick={GetnearByHospital}
+                                        disabled={loading}
+                                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                                    >
+                                        {loading ? (
+                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                        )}
+                                        Nearby
+                                    </button>
+                                    <button
+                                        onClick={getAllHospitals}
+                                        disabled={loading}
+                                        className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                                    >
+                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                                        </svg>
+                                        All
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Content based on active tab */}
+                        {activeTab === 'hospitals' && (
+                            <div>
+                                {error && (
+                                    <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                                        {error}
+                                    </div>
+                                )}
+
+                                {loading ? (
+                                    <div className="flex justify-center items-center py-12">
+                                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {filteredHospitals.map((hospital) => (
+                                            <div key={hospital._id} className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-lg transition-shadow duration-200">
+                                                <div className="p-6">
+                                                    <div className="flex items-start justify-between mb-4">
+                                                        <div className="flex-1">
+                                                            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                                                                {hospital.name}
+                                                            </h3>
+                                                            <p className="text-sm text-gray-600 mb-2">
+                                                                {hospital.address}
                                                             </p>
-                                                            <p className="text-sm text-gray-600">
-                                                                Specialization: {doctor.specialization || 'General'}
-                                                            </p>
-                                                            <p className="text-sm text-gray-600">
-                                                                Experience: {doctor.experience || 'N/A'} years
-                                                            </p>
-                                                            <p className="text-sm text-gray-600">
-                                                                Consultation Fee: ₹{doctor.consultationFee || 'N/A'}
-                                                            </p>
-                                                            {doctor.languages && (
-                                                                <p className="text-sm text-gray-600">
-                                                                    Languages: {Array.isArray(doctor.languages) ? doctor.languages.join(', ') : doctor.languages}
-                                                                </p>
+                                                            <div className="flex items-center text-sm text-gray-500">
+                                                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                                                </svg>
+                                                                {hospital.phone}
+                                                            </div>
+                                                        </div>
+                                                        <div className="ml-4">
+                                                            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                                                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                                                </svg>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="mb-4">
+                                                        <h4 className="text-sm font-medium text-gray-900 mb-2">Services:</h4>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {hospital.service?.slice(0, 3).map((service, index) => (
+                                                                <span key={index} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                                    {service}
+                                                                </span>
+                                                            ))}
+                                                            {hospital.service?.length > 3 && (
+                                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                                    +{hospital.service.length - 3} more
+                                                                </span>
                                                             )}
-                                                            
-                                                            <div className="flex gap-2 mt-3">
-                                                                {doctor._id && (
-                                                                    <button
-                                                                        onClick={() => handleBookAppointment(hospital, doctor)}
-                                                                        disabled={loading}
-                                                                        className="bg-[#2C3E50] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 shadow-sm hover:shadow-md transition-all duration-200"
-                                                                    >
-                                                                        {loading ? 'Booking...' : 'Book Appointment'}
-                                                                    </button>
-                                                                )}
-                                                                {doctor._id && (
-                                                                    <button
-                                                                        onClick={() => handleJoinQueue(hospital, doctor)}
-                                                                        className="bg-[#2C3E50] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 shadow-sm hover:shadow-md transition-all duration-200"
-                                                                    >
-                                                                        Join Queue
-                                                                    </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {doctorsMap[hospital._id] && doctorsMap[hospital._id].length > 0 && (
+                                                        <div className="mb-4">
+                                                            <h4 className="text-sm font-medium text-gray-900 mb-2">Available Doctors:</h4>
+                                                            <div className="space-y-2">
+                                                                {doctorsMap[hospital._id].slice(0, 2).map((doctor) => (
+                                                                    <div key={doctor._id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                                                                        <div>
+                                                                            <p className="text-sm font-medium text-gray-900">
+                                                                                {doctor.user ? 
+                                                                                    `${doctor.user.firstName || ''} ${doctor.user.lastName || ''}`.trim() || 'Unknown Doctor' 
+                                                                                    : doctor.name || 'Unknown Doctor'
+                                                                                }
+                                                                            </p>
+                                                                            <p className="text-xs text-gray-600">{doctor.specialization}</p>
+                                                                        </div>
+                                                                        <div className="flex space-x-1">
+                                                                            <button
+                                                                                onClick={() => handleBookAppointment(hospital, doctor)}
+                                                                                className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
+                                                                            >
+                                                                                Book
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleJoinQueue(hospital, doctor)}
+                                                                                className="px-3 py-1 text-xs font-medium text-green-600 bg-green-100 rounded-md hover:bg-green-200 transition-colors"
+                                                                            >
+                                                                                Queue
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                                {doctorsMap[hospital._id].length > 2 && (
+                                                                    <p className="text-xs text-gray-500 text-center">
+                                                                        +{doctorsMap[hospital._id].length - 2} more doctors
+                                                                    </p>
                                                                 )}
                                                             </div>
                                                         </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <p className="text-gray-500 italic">No doctors available at this hospital</p>
-                                    )}
-                                </div>
-                            ));
-                        })()}
-                        </>
-                    </div>
+                                                    )}
 
-                    <div className="mt-8 text-center">
-                        <button 
-                            onClick={getAllHospitals}
-                            disabled={loading}
-                            className="bg-[#2C3E50] text-white px-6 py-3 rounded-lg hover:opacity-90 transition-all duration-200 disabled:opacity-50"
-                        >
-                            {loading ? 'Loading...' : (isgetAll ? "Hide All Hospitals" : "Show All Hospitals")}
-                        </button>
-                    </div>
-                </div>
-            ) : activeTab === 'appointments' ? (
-                <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Appointments</h2>
-                    {loading ? (
-                        <div className="text-center py-4">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-                            <p className="mt-2 text-gray-600">Loading appointments...</p>
-                        </div>
-                    ) : error ? (
-                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-                            {error}
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {appointments && appointments.length > 0 ? (
-                                appointments.map((appointment) => (
-                                    <div key={appointment._id} className="border rounded-lg p-6 bg-gradient-to-r from-gray-50 to-white hover:shadow-md transition-all duration-200">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <h3 className="font-semibold text-lg text-gray-800">
-                                                    Dr. {(() => {
-                                                        const firstName = appointment.doctor?.firstName || appointment.doctor?.user?.firstName || '';
-                                                        const lastName = appointment.doctor?.lastName || appointment.doctor?.user?.lastName || '';
-                                                        const doctorName = firstName + (lastName ? ` ${lastName}` : '');
-                                                        return doctorName || 'Doctor Name Not Available';
-                                                    })()}
-                                                </h3>
-                                                <p className="text-gray-600">Hospital: {appointment.hospital?.name || 'Not specified'}</p>
-                                                <p className="text-gray-600">Date: {new Date(appointment.appointmentDate).toLocaleDateString()}</p>
-                                                <p className="text-gray-600">Time: {appointment.appointmentTime}</p>
-                                                <p className="text-gray-600">Reason: {appointment.reason || 'Not specified'}</p>
-                                                <p className="text-gray-600">
-                                                    Status: <span className={`font-medium ${
-                                                        appointment.status === 'approved' ? 'text-green-600' : 
-                                                        appointment.status === 'pending' ? 'text-yellow-600' : 
-                                                        'text-red-600'
-                                                    }`}>
-                                                        {appointment.status || 'pending'}
-                                                    </span>
-                                                </p>
+                                                    <div className="flex space-x-2">
+                                                        <button
+                                                            onClick={() => handleHospitalSelection(hospital._id)}
+                                                            className="flex-1 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                                        >
+                                                            View Details
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
+                                        ))}
                                     </div>
-                                ))
-                            ) : (
-                                <p className="text-gray-500 text-center py-4">No appointments scheduled</p>
-                            )}
-                        </div>
-                    )}
-                </div>
-            ) : (
-                <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Queue Status</h2>
-                    {selectedDoctor && selectedHospital ? (
-                        <div className="mb-6 p-6 bg-gradient-to-r from-[#A6DCEF]/20 to-white rounded-lg border border-[#A6DCEF] shadow-sm">
-                            <h3 className="font-semibold text-[#2C3E50] mb-2">Selected Queue:</h3>
-                            <p className="text-[#2C3E50]">
-                                <strong>Doctor:</strong> Dr. {(() => {
-                                    const firstName = selectedDoctor.user?.firstName || selectedDoctor.firstName || '';
-                                    const lastName = selectedDoctor.user?.lastName || selectedDoctor.lastName || '';
-                                    const doctorName = firstName + (lastName ? ` ${lastName}` : '');
-                                    return doctorName || 'Unknown';
-                                })()} ({selectedDoctor.specialization})
-                            </p>
-                            <p className="text-blue-700">
-                                <strong>Hospital:</strong> {selectedHospital.name}
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="text-center py-8">
-                            <p className="text-gray-500 mb-4">Please select a doctor and hospital to view queue status</p>
-                            <div className="flex flex-col space-y-4 max-w-md mx-auto">
-                                <select
-                                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-900 shadow-sm"
-                                    onChange={(e) => handleHospitalSelection(e.target.value)}
-                                    value={selectedHospital?._id || ''}
-                                >
-                                    <option value="">Select Hospital</option>
-                                    {allHospitalsList.map((hospital) => (
-                                        <option key={hospital._id} value={hospital._id}>
-                                            {hospital.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                )}
 
-                                {selectedHospital && selectedHospital.doctors && selectedHospital.doctors.length > 0 && (
-                                    <select
-                                        className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-900 shadow-sm"
-                                        onChange={(e) => {
-                                            const doctor = selectedHospital.doctors.find(d => d._id === e.target.value);
-                                            setSelectedDoctor(doctor);
-                                        }}
-                                        value={selectedDoctor?._id || ''}
-                                    >
-                                        <option value="">Select Doctor</option>
-                                        {selectedHospital.doctors.map((doctor) => {
-                                            const firstName = doctor.user?.firstName || doctor.firstName || '';
-                                            const lastName = doctor.user?.lastName || doctor.lastName || '';
-                                            const doctorName = firstName + (lastName ? ` ${lastName}` : '');
-                                            return (
-                                                <option key={doctor._id} value={doctor._id}>
-                                                    Dr. {doctorName || 'Unknown Doctor'} - {doctor.specialization}
-                                                </option>
-                                            );
-                                        })}
-                                    </select>
+                                {!loading && filteredHospitals.length === 0 && (
+                                    <div className="text-center py-12">
+                                        <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                        </svg>
+                                        <h3 className="mt-2 text-sm font-medium text-gray-900">No hospitals found</h3>
+                                        <p className="mt-1 text-sm text-gray-500">
+                                            {searchedTerm ? 'Try adjusting your search terms.' : 'No hospitals available in your area.'}
+                                        </p>
+                                    </div>
                                 )}
                             </div>
-                        </div>
-                    )}
-                    
+                        )}
 
-                    {selectedDoctor && selectedHospital && (
-                        <QueueSystem
-                            doctorId={selectedDoctor.user?._id || selectedDoctor.user}
-                            hospitalId={selectedHospital._id}
-                            role="patient"
-                        />
-                    )}
+                        {activeTab === 'appointments' && (
+                            <div>
+                                <div className="mb-6">
+                                    <h2 className="text-xl font-semibold text-gray-900 mb-4">Your Appointments</h2>
+                                    {appointments.length === 0 ? (
+                                        <div className="text-center py-12">
+                                            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            <h3 className="mt-2 text-sm font-medium text-gray-900">No appointments</h3>
+                                            <p className="mt-1 text-sm text-gray-500">You haven't booked any appointments yet.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {appointments.map((appointment) => (
+                                                <div key={appointment._id} className="bg-white border border-gray-200 rounded-lg p-4">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <h3 className="text-lg font-medium text-gray-900">
+                                                                Dr. {appointment.doctor?.name || 'Unknown Doctor'}
+                                                            </h3>
+                                                            <p className="text-sm text-gray-600">
+                                                                {appointment.hospital?.name || 'Unknown Hospital'}
+                                                            </p>
+                                                            <p className="text-sm text-gray-500">
+                                                                {new Date(appointment.appointmentDate).toLocaleDateString()} at {appointment.appointmentTime}
+                                                            </p>
+                                                            <p className="text-sm text-gray-500">
+                                                                Reason: {appointment.reason}
+                                                            </p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                                appointment.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                                                appointment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                                                'bg-red-100 text-red-800'
+                                                            }`}>
+                                                                {appointment.status}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'queue' && (
+                            <div>
+                                {selectedHospital && selectedDoctor ? (
+                                    <QueueSystem
+                                        doctorId={selectedDoctor._id}
+                                        hospitalId={selectedHospital._id}
+                                        role="patient"
+                                    />
+                                ) : (
+                                    <div className="text-center py-12">
+                                        <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                        </svg>
+                                        <h3 className="mt-2 text-sm font-medium text-gray-900">Select a doctor to join queue</h3>
+                                        <p className="mt-1 text-sm text-gray-500">Choose a hospital and doctor from the Hospitals tab to join their queue.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
-            )}
+            </div>
 
-            {/* Appointment Booking Modal */}
-            {showAppointmentForm && selectedDoctor && selectedHospital && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-lg p-6 max-w-md w-full">
-                        <h3 className="text-xl font-semibold mb-4 text-[#2C3E50]">
-                            Book Appointment with Dr. {(() => {
-                                const firstName = selectedDoctor.user?.firstName || selectedDoctor.firstName || '';
-                                const lastName = selectedDoctor.user?.lastName || selectedDoctor.lastName || '';
-                                const doctorName = firstName + (lastName ? ` ${lastName}` : '');
-                                return doctorName || 'Unknown';
-                            })()}
-                        </h3>
-                        <form onSubmit={handleAppointmentSubmit} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                                <input
-                                    type="date"
-                                    value={appointmentDate}
-                                    onChange={(e) => setAppointmentDate(e.target.value)}
-                                    min={new Date().toISOString().split('T')[0]}
-                                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#2C3E50]"
-                                    required
-                                />
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Time (24-hour format)</label>
-                                <input
-                                    type="time"
-                                    value={appointmentTime}
-                                    onChange={(e) => setAppointmentTime(e.target.value)}
-                                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#2C3E50]"
-                                    required
-                                />
-                                <p className="text-xs text-gray-500 mt-1">Enter time in 24-hour format (e.g., 14:30 for 2:30 PM)</p>
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Visit</label>
-                                <textarea
-                                    value={appointmentReason}
-                                    onChange={(e) => setAppointmentReason(e.target.value)}
-                                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#2C3E50]"
-                                    rows="3"
-                                    placeholder="Please describe your symptoms or reason for visit..."
-                                    required
-                                />
-                            </div>
-                            <div className="flex justify-end space-x-3 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowAppointmentForm(false);
-                                        setSelectedHospital(null);
-                                        setSelectedDoctor(null);
-                                        setAppointmentDate('');
-                                        setAppointmentTime('');
-                                        setAppointmentReason('');
-                                    }}
-                                    className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={loading}
-                                    className="px-4 py-2 bg-[#2C3E50] text-white rounded hover:opacity-90 disabled:opacity-50"
-                                >
-                                    {loading ? 'Creating...' : 'Create Appointment'}
-                                </button>
-                            </div>
-                        </form>
+            {/* Appointment Form Modal */}
+            {showAppointmentForm && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                    <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                        <div className="mt-3">
+                            <h3 className="text-lg font-medium text-gray-900 mb-4">Book Appointment</h3>
+                            <form onSubmit={handleAppointmentSubmit} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Doctor
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={selectedDoctor?.user ? 
+                                            `${selectedDoctor.user.firstName || ''} ${selectedDoctor.user.lastName || ''}`.trim() || 'Unknown Doctor'
+                                            : selectedDoctor?.name || ''
+                                        }
+                                        disabled
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Hospital
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={selectedHospital?.name || ''}
+                                        disabled
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={appointmentDate}
+                                        onChange={(e) => setAppointmentDate(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Time
+                                    </label>
+                                    <input
+                                        type="time"
+                                        value={appointmentTime}
+                                        onChange={(e) => setAppointmentTime(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Reason
+                                    </label>
+                                    <textarea
+                                        value={appointmentReason}
+                                        onChange={(e) => setAppointmentReason(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        rows="3"
+                                        placeholder="Describe your symptoms or reason for visit..."
+                                        required
+                                    />
+                                </div>
+                                <div className="flex space-x-3">
+                                    <button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                                    >
+                                        {loading ? 'Booking...' : 'Book Appointment'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAppointmentForm(false)}
+                                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
             )}
-            </div>
         </div>
     );
 };

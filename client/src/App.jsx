@@ -8,6 +8,7 @@ import DoctorDashboard from "./components/DoctorDashboard";
 import HospitalDashborad from "./components/HospitalDashborad";
 import HospitalSelection from "./components/HospitalSelection";
 import ChatWidget from "./components/ChatWidget";
+import Navigation from "./components/Navigation";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./ProtectedRoute";
 import SkinSightFeatures from "./components/features";

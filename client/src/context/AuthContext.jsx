@@ -83,13 +83,21 @@ export const AuthProvider = ({ children }) => {
 
     const signout = async () => {
         try {
-            await axios.get('/auth/signout');
+            // Try to call the server logout endpoint
+            if (token) {
+                await axios.get('/auth/signout');
+            }
+        } catch (err) {
+            console.error('Server signout error:', err);
+            // Continue with local cleanup even if server call fails
+        } finally {
+            // Always clean up local state
             localStorage.removeItem('token');
+            localStorage.removeItem('user');
             setToken(null);
             setUser(null);
+            setError(null);
             delete axios.defaults.headers.common['Authorization'];
-        } catch (err) {
-            console.error('Signout error:', err);
         }
     };
 
