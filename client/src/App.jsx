@@ -7,6 +7,7 @@ import PatientDashBroad from "./components/PatientDashBroad";
 import DoctorDashboard from "./components/DoctorDashboard";
 import HospitalDashborad from "./components/HospitalDashborad";
 import HospitalSelection from "./components/HospitalSelection";
+import HospitalDetails from "./components/HospitalDetails";
 import ChatWidget from "./components/ChatWidget";
 import Navigation from "./components/Navigation";
 import { AuthProvider } from "./context/AuthContext";
@@ -55,6 +56,14 @@ function App() {
                 element={
                   <ProtectedRoute roles={['staff', 'doctor']}>
                     <HospitalSelection />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/hospital-details/:hospitalId"
+                element={
+                  <ProtectedRoute roles={['patient']}>
+                    <HospitalDetails />
                   </ProtectedRoute>
                 }
               />

@@ -59,10 +59,9 @@ const DoctorDashboard = () => {
     const fetchDoctorProfile = async () => {
         try {
             setLoading(true);
-            // Set base URL for axios
-            axios.defaults.baseURL = 'https://mycarebridge.onrender.com/api';
+            const API_URL = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com/api';
             
-            const response = await axios.get('/doctors/profile', {
+            const response = await axios.get(`${API_URL}/doctors/profile`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 }
@@ -87,8 +86,9 @@ const DoctorDashboard = () => {
     const fetchDoctorAppointments = async () => {
         try {
             console.log('Fetching appointments for doctor ID:', user._id);
+            const API_URL = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com/api';
             
-            const response = await axios.get(`/appointments/doctor/${user._id}`, {
+            const response = await axios.get(`${API_URL}/appointments/doctor/${user._id}`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 }
@@ -113,7 +113,8 @@ const DoctorDashboard = () => {
 
     const handleApproveAppointment = async (appointmentId) => {
         try {
-            await axios.put(`/doctors/appointments/${appointmentId}/approve`, {
+            const API_URL = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com/api';
+            await axios.put(`${API_URL}/appointments/${appointmentId}/approve`, {
                 approvalStatus: 'approved',
                 approvalMessage: 'Appointment approved by doctor'
             }, {
@@ -131,7 +132,8 @@ const DoctorDashboard = () => {
 
     const handleRejectAppointment = async (appointmentId) => {
         try {
-            await axios.put(`/doctors/appointments/${appointmentId}/approve`, {
+            const API_URL = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com/api';
+            await axios.put(`${API_URL}/appointments/${appointmentId}/approve`, {
                 approvalStatus: 'rejected',
                 approvalMessage: 'Appointment rejected by doctor'
             }, {
@@ -203,7 +205,7 @@ const DoctorDashboard = () => {
     );
 
     const approvedAppointments = appointments.filter(appointment => 
-        appointment.status === 'approved'
+        appointment.status === 'confirmed'
     );
 
     return (
@@ -273,7 +275,7 @@ const DoctorDashboard = () => {
                                 </svg>
                             </div>
                             <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-600">Approved</p>
+                                <p className="text-sm font-medium text-gray-600">Confirmed</p>
                                 <p className="text-2xl font-bold text-gray-900">{approvedAppointments.length}</p>
                             </div>
                         </div>
@@ -370,16 +372,17 @@ const DoctorDashboard = () => {
                                                         <div key={appointment._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                                                             <div>
                                                                 <p className="font-medium text-gray-900">
-                                                                    {appointment.patient?.name || 'Unknown Patient'}
+                                                                    {appointment.patient?.firstName || ''} {appointment.patient?.lastName || ''}
                                                                 </p>
                                                                 <p className="text-sm text-gray-600">
-                                                                    {appointment.appointmentTime} - {appointment.reason}
+                                                                    {new Date(appointment.appointmentTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {appointment.reason}
                                                                 </p>
                                                             </div>
                                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                                appointment.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                                                appointment.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                                                                 appointment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                                                'bg-red-100 text-red-800'
+                                                                appointment.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                                                'bg-gray-100 text-gray-800'
                                                             }`}>
                                                                 {appointment.status}
                                                             </span>
@@ -410,14 +413,14 @@ const DoctorDashboard = () => {
                                                         <div key={appointment._id} className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                                                             <div className="flex items-center justify-between mb-2">
                                                                 <p className="font-medium text-gray-900">
-                                                                    {appointment.patient?.name || 'Unknown Patient'}
+                                                                    {appointment.patient?.firstName || ''} {appointment.patient?.lastName || ''}
                                                                 </p>
                                                                 <span className="text-xs text-yellow-800 bg-yellow-100 px-2 py-1 rounded-full">
                                                                     Pending
                                                                 </span>
                                                             </div>
                                                             <p className="text-sm text-gray-600 mb-3">
-                                                                {new Date(appointment.appointmentDate).toLocaleDateString()} at {appointment.appointmentTime}
+                                                                {new Date(appointment.appointmentDate).toLocaleDateString()} at {new Date(appointment.appointmentTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                                             </p>
                                                             <p className="text-sm text-gray-600 mb-3">
                                                                 Reason: {appointment.reason}
@@ -465,23 +468,40 @@ const DoctorDashboard = () => {
                                                     <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                                                         <div className="flex-1">
                                                             <h3 className="text-lg font-medium text-gray-900">
-                                                                {appointment.patient?.name || 'Unknown Patient'}
+                                                                {appointment.patient?.firstName || ''} {appointment.patient?.lastName || ''}
                                                             </h3>
                                                             <p className="text-sm text-gray-600">
-                                                                {new Date(appointment.appointmentDate).toLocaleDateString()} at {appointment.appointmentTime}
+                                                                {appointment.hospital?.name || 'Unknown Hospital'}
+                                                            </p>
+                                                            <p className="text-sm text-gray-600">
+                                                                {new Date(appointment.appointmentDate).toLocaleDateString()} at {new Date(appointment.appointmentTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                                             </p>
                                                             <p className="text-sm text-gray-600">
                                                                 Reason: {appointment.reason}
                                                             </p>
+                                                            {appointment.approvalMessage && (
+                                                                <p className="text-sm text-gray-500">
+                                                                    Note: {appointment.approvalMessage}
+                                                                </p>
+                                                            )}
                                                         </div>
                                                         <div className="mt-4 md:mt-0 md:ml-6 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                                                             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                                                                appointment.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                                                appointment.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                                                                 appointment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                                                'bg-red-100 text-red-800'
+                                                                appointment.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                                                'bg-gray-100 text-gray-800'
                                                             }`}>
                                                                 {appointment.status}
                                                             </span>
+                                                            {appointment.approvalStatus && appointment.approvalStatus !== 'pending' && (
+                                                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                                                    appointment.approvalStatus === 'approved' ? 'bg-green-100 text-green-800' :
+                                                                    'bg-red-100 text-red-800'
+                                                                }`}>
+                                                                    {appointment.approvalStatus}
+                                                                </span>
+                                                            )}
                                                             {appointment.status === 'pending' && (
                                                                 <div className="flex space-x-2">
                                                                     <button

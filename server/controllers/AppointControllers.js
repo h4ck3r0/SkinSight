@@ -6,13 +6,11 @@ export async function createAppointment(req, res) {
         const { doctor, patient, hospital, appointmentTime, reason, appointmentDate } = req.body;
         console.log('Appointment request:', { doctor, patient, hospital, appointmentTime, appointmentDate, reason });
         
-        const doctorProfile = await DocterModel.findById(doctor);
+        // Find doctor profile by user ID
+        const doctorProfile = await DocterModel.findOne({ user: doctor });
         if (!doctorProfile) {
             return res.status(404).json({ message: "Doctor profile not found" });
         }
-
-        // Use the doctor's user ID instead of profile ID for the appointment
-        const doctorUserId = doctorProfile.user;
 
         // Create a proper date object combining date and time
         const [year, month, day] = appointmentDate.split('-').map(Number);
@@ -21,45 +19,54 @@ export async function createAppointment(req, res) {
         
         console.log('Checking availability for:', appointmentDateTime);
         
-        if (!doctorProfile.isAvailableAt(appointmentDateTime)) {
-            const nextSlot = doctorProfile.getNextAvailableSlot(appointmentDateTime);
-            console.log('Next available slot:', nextSlot);
+        // Check if doctor is available (simplified check for now)
+        const dayOfWeek = appointmentDateTime.toLocaleDateString('en-US', { weekday: 'long' });
+        const time = appointmentDateTime.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+        
+        const availabilitySlot = doctorProfile.availability.find(slot => 
+            slot.day === dayOfWeek && 
+            time >= slot.startTime && 
+            time <= slot.endTime && 
+            slot.isAvailable
+        );
+        
+        if (!availabilitySlot) {
             return res.status(400).json({ 
-                message: "Doctor is not available at the requested time",
-                nextAvailableSlot: nextSlot
+                message: "Doctor is not available at the requested time"
             });
         }
 
+        // Check for existing appointments
         const existingAppointment = await Appointment.findOne({
-            doctor: doctorUserId,
+            doctor: doctor,
             appointmentTime: appointmentDateTime,
             status: { $in: ['pending', 'confirmed'] }
         });
 
         if (existingAppointment) {
-            const nextSlot = doctorProfile.getNextAvailableSlot(appointmentDateTime);
             return res.status(400).json({ 
-                message: "Doctor already has an appointment at this time",
-                nextAvailableSlot: nextSlot
+                message: "Doctor already has an appointment at this time"
             });
         }
 
         const appointment = new Appointment({
-            doctor: doctorUserId, // Use user ID instead of profile ID
+            doctor: doctor, // Use the user ID directly
             patient,
             hospital,
             appointmentTime: appointmentDateTime,
             appointmentDate: new Date(appointmentDate),
             reason,
-            status: 'pending'
+            status: 'pending',
+            approvalStatus: 'pending'
         });
 
         await appointment.save();
 
+        // Update doctor profile with the new appointment
         doctorProfile.appointments.push({
             date: new Date(appointmentDate),
             startTime: appointmentTime,
-            endTime: appointmentTime, // You might want to calculate this based on appointment duration
+            endTime: appointmentTime,
             isAvailable: false
         });
 

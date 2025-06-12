@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGeolocation } from "../hooks/useGeolocation";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import QueueSystem from "./QueueSystem";
 import Navigation from "./Navigation";
 import { toast } from "react-hot-toast";
@@ -43,6 +43,25 @@ const PatientDashBroad = () => {
             navigate('/login');
         }
     }, [navigate]);
+
+    // Handle navigation state from HospitalDetails
+    const routerLocation = useLocation();
+    useEffect(() => {
+        if (routerLocation.state) {
+            const { activeTab, selectedHospital, selectedDoctor } = routerLocation.state;
+            if (activeTab) {
+                setActiveTab(activeTab);
+            }
+            if (selectedHospital) {
+                setSelectedHospital(selectedHospital);
+            }
+            if (selectedDoctor) {
+                setSelectedDoctor(selectedDoctor);
+            }
+            // Clear the state to prevent it from persisting
+            window.history.replaceState({}, document.title);
+        }
+    }, [routerLocation.state]);
 
     useEffect(() => {
         if (location) {
@@ -251,7 +270,7 @@ const PatientDashBroad = () => {
     };
 
     const handleHospitalSelection = (hospitalId) => {
-        navigate(`/hospital-selection/${hospitalId}`);
+        navigate(`/hospital-details/${hospitalId}`);
     };
 
     const filteredHospitals = searchedTerm
@@ -587,26 +606,42 @@ const PatientDashBroad = () => {
                                                     <div className="flex items-center justify-between">
                                                         <div>
                                                             <h3 className="text-lg font-medium text-gray-900">
-                                                                Dr. {appointment.doctor?.name || 'Unknown Doctor'}
+                                                                Dr. {appointment.doctor?.firstName || ''} {appointment.doctor?.lastName || ''}
                                                             </h3>
                                                             <p className="text-sm text-gray-600">
                                                                 {appointment.hospital?.name || 'Unknown Hospital'}
                                                             </p>
                                                             <p className="text-sm text-gray-500">
-                                                                {new Date(appointment.appointmentDate).toLocaleDateString()} at {appointment.appointmentTime}
+                                                                {new Date(appointment.appointmentDate).toLocaleDateString()} at {new Date(appointment.appointmentTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                                             </p>
                                                             <p className="text-sm text-gray-500">
                                                                 Reason: {appointment.reason}
                                                             </p>
+                                                            {appointment.approvalMessage && (
+                                                                <p className="text-sm text-gray-500">
+                                                                    Note: {appointment.approvalMessage}
+                                                                </p>
+                                                            )}
                                                         </div>
                                                         <div className="text-right">
                                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                                appointment.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                                                appointment.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                                                                 appointment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                                                'bg-red-100 text-red-800'
+                                                                appointment.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                                                'bg-gray-100 text-gray-800'
                                                             }`}>
                                                                 {appointment.status}
                                                             </span>
+                                                            {appointment.approvalStatus && appointment.approvalStatus !== 'pending' && (
+                                                                <div className="mt-1">
+                                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                                        appointment.approvalStatus === 'approved' ? 'bg-green-100 text-green-800' :
+                                                                        'bg-red-100 text-red-800'
+                                                                    }`}>
+                                                                        {appointment.approvalStatus}
+                                                                    </span>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
