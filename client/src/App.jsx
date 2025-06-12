@@ -29,7 +29,14 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path='/features' element={<SkinSightFeatures/>}/>
-              <Route path='/ml' element={<SkinAnalyzer/>}/>
+              <Route
+                path="/ml"
+                element={
+                  <ProtectedRoute roles={['patient']}>
+                    <SkinAnalyzer />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/patient"
                 element={

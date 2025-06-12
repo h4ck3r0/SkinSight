@@ -310,7 +310,7 @@ const PatientDashBroad = () => {
                 </div>
 
                 {/* Quick Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
                         <div className="flex items-center">
                             <div className="p-3 bg-blue-100 rounded-lg">
@@ -354,55 +354,75 @@ const PatientDashBroad = () => {
                             </div>
                         </div>
                     </div>
+                    {/* Add Skin Analyzer Card */}
+                    <div
+                        onClick={() => navigate('/ml')}
+                        className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 cursor-pointer transition-all hover:shadow-xl hover:scale-[1.02]"
+                    >
+                        <div className="flex items-center">
+                            <div className="p-3 bg-purple-100 rounded-lg">
+                                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                </svg>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-medium text-gray-600">Skin Analyzer</p>
+                                <p className="text-sm text-gray-500">AI-powered skin analysis</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Tab Navigation */}
                 <div className="bg-white rounded-xl shadow-lg border border-gray-100 mb-8">
                     <div className="border-b border-gray-200">
-                        <nav className="flex space-x-8 px-6" aria-label="Tabs">
+                        <nav className="flex justify-around md:justify-start md:space-x-8 px-4 md:px-6" aria-label="Tabs">
                             <button
                                 onClick={() => setActiveTab('hospitals')}
-                                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                                className={`py-4 px-3 md:px-4 border-b-2 font-medium text-sm transition-colors duration-200 ${
                                     activeTab === 'hospitals'
                                         ? 'border-blue-500 text-blue-600'
                                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
+                                title="Hospitals"
                             >
-                                <div className="flex items-center space-x-2">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div className="flex items-center">
+                                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                     </svg>
-                                    <span>Hospitals</span>
+                                    <span className="hidden md:block ml-2">Hospitals</span>
                                 </div>
                             </button>
                             <button
                                 onClick={() => setActiveTab('appointments')}
-                                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                                className={`py-4 px-3 md:px-4 border-b-2 font-medium text-sm transition-colors duration-200 ${
                                     activeTab === 'appointments'
                                         ? 'border-blue-500 text-blue-600'
                                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
+                                title="Appointments"
                             >
-                                <div className="flex items-center space-x-2">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div className="flex items-center">
+                                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                     </svg>
-                                    <span>Appointments</span>
+                                    <span className="hidden md:block ml-2">Appointments</span>
                                 </div>
                             </button>
                             <button
                                 onClick={() => setActiveTab('queue')}
-                                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                                className={`py-4 px-3 md:px-4 border-b-2 font-medium text-sm transition-colors duration-200 ${
                                     activeTab === 'queue'
                                         ? 'border-blue-500 text-blue-600'
                                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
+                                title="Queue"
                             >
-                                <div className="flex items-center space-x-2">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div className="flex items-center">
+                                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                                     </svg>
-                                    <span>Queue</span>
+                                    <span className="hidden md:block ml-2">Queue</span>
                                 </div>
                             </button>
                         </nav>
