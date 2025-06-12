@@ -89,7 +89,7 @@ export const SetupSocket = (server) => {
                         position,
                         estimatedWaitTime: position * 15 
                     });
-e
+
                     io.to(doctorId).emit('queueUpdate', {
                         doctorId,
                         hospitalId,
