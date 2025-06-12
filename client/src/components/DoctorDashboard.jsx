@@ -319,7 +319,6 @@ const DoctorDashboard = () => {
         );
     }
 
-    // Check if user has hospital assigned
     if (!user?.hospitalId) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -339,7 +338,6 @@ const DoctorDashboard = () => {
         );
     }
 
-    // Filter today's appointments from actual appointments
     const today = new Date();
     const todayString = today.toDateString();
     
@@ -447,8 +445,6 @@ const DoctorDashboard = () => {
                         </div>
                     </div>
                 </div>
-
-                {/* Tab Navigation */}
                 <div className="bg-white rounded-xl shadow-lg border border-gray-100 mb-8">
                     <div className="border-b border-gray-200">
                         <nav className="flex space-x-8 px-6" aria-label="Tabs">
