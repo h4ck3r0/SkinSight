@@ -9,7 +9,7 @@ const SkinAnalyzer = () => {
   const [error, setError] = useState('');
 
   // Replace this with your render.com deployed ML service URL
-  const ML_SERVICE_URL = 'https://your-ml-service.onrender.com/predict';
+  const ML_SERVICE_URL = 'https://skinsight-ml.onrender.com';
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];

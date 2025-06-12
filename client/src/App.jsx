@@ -15,6 +15,7 @@ import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./ProtectedRoute";
 import SkinSightFeatures from "./components/features";
 import { SocketProvider } from './context/SocketContext';
+import SkinAnalyzer from "./components/SkinAnalyzer";
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path='/features' element={<SkinSightFeatures/>}/>
+              <Route path='/ml' element={<SkinAnalyzer/>}/>
               <Route
                 path="/patient"
                 element={
