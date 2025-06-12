@@ -1,4 +1,6 @@
 import os
+os.environ['NUMPY_EXPERIMENTAL_ARRAY_FUNCTION'] = '0'  # Fix for NumPy issue
+
 import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
@@ -11,15 +13,24 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-# Load class names
-with open('class_names.pkl', 'rb') as f:
-    class_names = pickle.load(f)
+try:
+    # Load class names
+    with open('class_names.pkl', 'rb') as f:
+        class_names = pickle.load(f)
 
-# Load model
-model = models.resnet50(weights=None)
-model.fc = nn.Linear(model.fc.in_features, len(class_names))
-model.load_state_dict(torch.load('best_resnet50_model.pth', map_location='cpu'))
-model.eval()
+    # Load model with CPU device
+    device = torch.device('cpu')
+    model = models.resnet50(weights=None)
+    model.fc = nn.Linear(model.fc.in_features, len(class_names))
+    model.load_state_dict(torch.load('best_resnet50_model.pth', map_location=device))
+    model.to(device)
+    model.eval()
+
+    print("Model loaded successfully!")
+except Exception as e:
+    print(f"Error loading model: {str(e)}")
+    model = None
+    class_names = []
 
 # Image transform
 transform = transforms.Compose([
@@ -31,6 +42,9 @@ transform = transforms.Compose([
 
 @app.route('/predict', methods=['POST'])
 def predict():
+    if model is None:
+        return jsonify({'error': 'Model not initialized'}), 500
+
     if 'image' not in request.files:
         return jsonify({'error': 'No image uploaded'}), 400
     
@@ -41,23 +55,27 @@ def predict():
     try:
         # Load and preprocess image
         img = Image.open(file.stream).convert('RGB')
-        img_tensor = transform(img).unsqueeze(0)  # Add batch dimension
+        img_tensor = transform(img).unsqueeze(0).to(device)
 
         with torch.no_grad():
             outputs = model(img_tensor)
-            _, predicted = torch.max(outputs, 1)
+            probabilities = torch.softmax(outputs, dim=1)
+            confidence, predicted = torch.max(probabilities, 1)
             prediction = class_names[predicted.item()]
 
         return jsonify({
             'prediction': prediction,
-            'confidence': float(outputs.max().item())
+            'confidence': float(confidence.item())
         })
     
     except Exception as e:
+        print(f"Prediction error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/health', methods=['GET'])
 def health_check():
+    if model is None:
+        return jsonify({'status': 'unhealthy', 'error': 'Model not loaded'}), 500
     return jsonify({'status': 'healthy'})
 
 if __name__ == '__main__':
