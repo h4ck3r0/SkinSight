@@ -1,20 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import { useGeolocation } from '../hooks/useGeolocation';
 import QueueSystem from './QueueSystem';
 import Navigation from './Navigation';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com/api';
+
 const DoctorDashboard = () => {
     const { user } = useAuth();
     const { socket } = useSocket();
+    const { location, error: locationError } = useGeolocation();
     const [doctorProfile, setDoctorProfile] = useState(null);
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isSocketConnected, setIsSocketConnected] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
+    const [updating, setUpdating] = useState(false);
+    const [editForm, setEditForm] = useState({
+        specialization: '',
+        experience: '',
+        consultationFee: '',
+        bio: '',
+        address: '',
+        languages: ['English'],
+        availability: [
+            {
+                day: 'Monday',
+                startTime: '09:00',
+                endTime: '17:00',
+                isAvailable: true
+            },
+            {
+                day: 'Tuesday',
+                startTime: '09:00',
+                endTime: '17:00',
+                isAvailable: true
+            },
+            {
+                day: 'Wednesday',
+                startTime: '09:00',
+                endTime: '17:00',
+                isAvailable: true
+            },
+            {
+                day: 'Thursday',
+                startTime: '09:00',
+                endTime: '17:00',
+                isAvailable: true
+            },
+            {
+                day: 'Friday',
+                startTime: '09:00',
+                endTime: '17:00',
+                isAvailable: true
+            }
+        ]
+    });
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -34,61 +79,90 @@ const DoctorDashboard = () => {
 
     // Socket connection and room joining
     useEffect(() => {
-        if (socket && user?._id) {
-            // Check socket connection status
-            setIsSocketConnected(socket.connected);
-
-            // Join the doctor's room for receiving queue updates
-            socket.emit('joinRoom', user._id);
-
-            // Socket event listeners
+        if (socket && user) {
             socket.on('connect', () => {
+                console.log('Connected to socket server');
                 setIsSocketConnected(true);
+                
+                // Join user's room
                 socket.emit('joinRoom', user._id);
-                console.log('Doctor connected to socket and joined room:', user._id);
             });
 
             socket.on('disconnect', () => {
+                console.log('Disconnected from socket server');
                 setIsSocketConnected(false);
-                console.log('Doctor disconnected from socket');
-            });
-
-            socket.on('error', (error) => {
-                console.error('Socket error:', error);
-                toast.error(`Socket error: ${error}`);
             });
 
             return () => {
                 socket.off('connect');
                 socket.off('disconnect');
-                socket.off('error');
             };
         }
-    }, [socket, user?._id]);
+    }, [socket, user]);
 
     const checkDoctorProfile = async () => {
         try {
             setLoading(true);
-            const API_URL = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com/api';
             const response = await axios.get(`${API_URL}/doctors/profile`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
             });
-            
+
             if (response.data && response.data.doctor) {
-                setDoctorProfile(response.data.doctor.profile);
-                fetchDoctorAppointments();
+                setDoctorProfile(response.data.doctor);
+                
+                // Initialize edit form with current data
+                setEditForm({
+                    specialization: response.data.doctor.specialization || '',
+                    experience: response.data.doctor.experience || '',
+                    consultationFee: response.data.doctor.consultationFee || '',
+                    bio: response.data.doctor.bio || '',
+                    address: response.data.doctor.address || '',
+                    languages: response.data.doctor.languages || ['English'],
+                    availability: response.data.doctor.availability || [
+                        {
+                            day: 'Monday',
+                            startTime: '09:00',
+                            endTime: '17:00',
+                            isAvailable: true
+                        },
+                        {
+                            day: 'Tuesday',
+                            startTime: '09:00',
+                            endTime: '17:00',
+                            isAvailable: true
+                        },
+                        {
+                            day: 'Wednesday',
+                            startTime: '09:00',
+                            endTime: '17:00',
+                            isAvailable: true
+                        },
+                        {
+                            day: 'Thursday',
+                            startTime: '09:00',
+                            endTime: '17:00',
+                            isAvailable: true
+                        },
+                        {
+                            day: 'Friday',
+                            startTime: '09:00',
+                            endTime: '17:00',
+                            isAvailable: true
+                        }
+                    ]
+                });
             }
+            
+            // Fetch appointments regardless of profile status
+            await fetchDoctorAppointments();
         } catch (error) {
+            console.error('Error checking doctor profile:', error);
             if (error.response?.status === 404) {
-                // Doctor profile not found, redirect to profile setup
-                toast.error('Please complete your doctor profile first');
+                // Profile doesn't exist, redirect to profile setup
                 navigate('/doctor-profile-setup');
                 return;
-            } else {
-                console.error('Error checking doctor profile:', error);
-                toast.error('Failed to check doctor profile');
             }
         } finally {
             setLoading(false);
@@ -97,45 +171,32 @@ const DoctorDashboard = () => {
 
     const fetchDoctorAppointments = async () => {
         try {
-            console.log('Fetching appointments for doctor ID:', user._id);
-            const API_URL = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com/api';
-            
-            const response = await axios.get(`${API_URL}/appointments/doctor/${user._id}`, {
+            const response = await axios.get(`${API_URL}/doctors/appointments`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
             });
-            
-            console.log('Full response:', response);
-            
+
             if (response.data && response.data.appointments) {
                 setAppointments(response.data.appointments);
-                console.log('Doctor appointments fetched:', response.data.appointments);
-            } else {
-                console.log('No appointments found');
-                setAppointments([]);
             }
         } catch (error) {
-            console.error('Error fetching doctor appointments:', error);
-            console.error('Error response:', error.response);
-            toast.error('Failed to fetch appointments');
-            setAppointments([]);
+            console.error('Error fetching appointments:', error);
         }
     };
 
     const handleApproveAppointment = async (appointmentId) => {
         try {
-            const API_URL = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com/api';
-            await axios.put(`${API_URL}/doctors/appointments/${appointmentId}/approve`, {
-                approvalStatus: 'approved',
-                approvalMessage: 'Appointment approved by doctor'
-            }, {
+            const response = await axios.put(`${API_URL}/doctors/approve-appointment/${appointmentId}`, {}, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
             });
-            toast.success('Appointment approved successfully');
-            fetchDoctorAppointments(); // Refresh appointments
+
+            if (response.data) {
+                toast.success('Appointment approved successfully!');
+                await fetchDoctorAppointments();
+            }
         } catch (error) {
             console.error('Error approving appointment:', error);
             toast.error('Failed to approve appointment');
@@ -144,20 +205,99 @@ const DoctorDashboard = () => {
 
     const handleRejectAppointment = async (appointmentId) => {
         try {
-            const API_URL = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com/api';
-            await axios.put(`${API_URL}/doctors/appointments/${appointmentId}/approve`, {
-                approvalStatus: 'rejected',
-                approvalMessage: 'Appointment rejected by doctor'
-            }, {
+            const response = await axios.put(`${API_URL}/doctors/reject-appointment/${appointmentId}`, {}, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
             });
-            toast.success('Appointment rejected successfully');
-            fetchDoctorAppointments(); // Refresh appointments
+
+            if (response.data) {
+                toast.success('Appointment rejected successfully!');
+                await fetchDoctorAppointments();
+            }
         } catch (error) {
             console.error('Error rejecting appointment:', error);
             toast.error('Failed to reject appointment');
+        }
+    };
+
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setEditForm(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleAvailabilityChange = (index, field, value) => {
+        setEditForm(prev => ({
+            ...prev,
+            availability: prev.availability.map((slot, i) => 
+                i === index ? { ...slot, [field]: value } : slot
+            )
+        }));
+    };
+
+    const toggleAvailability = (index) => {
+        setEditForm(prev => ({
+            ...prev,
+            availability: prev.availability.map((slot, i) => 
+                i === index ? { ...slot, isAvailable: !slot.isAvailable } : slot
+            )
+        }));
+    };
+
+    const handleLanguageChange = (e) => {
+        const languages = e.target.value.split(',').map(lang => lang.trim());
+        setEditForm(prev => ({
+            ...prev,
+            languages
+        }));
+    };
+
+    const handleUpdateProfile = async (e) => {
+        e.preventDefault();
+        setUpdating(true);
+
+        try {
+            // Check if location is available for update
+            if (!location || !location.lat || !location.lng) {
+                toast.error('Please enable location access to update your profile');
+                setUpdating(false);
+                return;
+            }
+
+            // Prepare location data
+            const locationData = {
+                type: 'Point',
+                coordinates: [parseFloat(location.lng), parseFloat(location.lat)]
+            };
+
+            const profileData = {
+                ...editForm,
+                location: locationData
+            };
+
+            const response = await axios.put(
+                `${API_URL}/doctors/profile`,
+                profileData,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (response.data) {
+                toast.success('Profile updated successfully!');
+                await checkDoctorProfile(); // Refresh profile data
+            }
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            toast.error(error.response?.data?.message || 'Failed to update profile');
+        } finally {
+            setUpdating(false);
         }
     };
 
@@ -357,6 +497,21 @@ const DoctorDashboard = () => {
                                     <span>Queue Management</span>
                                 </div>
                             </button>
+                            <button
+                                onClick={() => setActiveTab('profile')}
+                                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                                    activeTab === 'profile'
+                                        ? 'border-blue-500 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                            >
+                                <div className="flex items-center space-x-2">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                    <span>Profile</span>
+                                </div>
+                            </button>
                         </nav>
                     </div>
 
@@ -497,7 +652,7 @@ const DoctorDashboard = () => {
                                                                 </p>
                                                             )}
                                                         </div>
-                                                        <div className="mt-4 md:mt-0 md:ml-6 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                                                        <div className="mt-4 md:mt-0 md:ml-4">
                                                             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                                                                 appointment.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                                                                 appointment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
@@ -506,30 +661,6 @@ const DoctorDashboard = () => {
                                                             }`}>
                                                                 {appointment.status}
                                                             </span>
-                                                            {appointment.approvalStatus && appointment.approvalStatus !== 'pending' && (
-                                                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                                                                    appointment.approvalStatus === 'approved' ? 'bg-green-100 text-green-800' :
-                                                                    'bg-red-100 text-red-800'
-                                                                }`}>
-                                                                    {appointment.approvalStatus}
-                                                                </span>
-                                                            )}
-                                                            {appointment.status === 'pending' && (
-                                                                <div className="flex space-x-2">
-                                                                    <button
-                                                                        onClick={() => handleApproveAppointment(appointment._id)}
-                                                                        className="px-3 py-1 text-sm font-medium text-green-600 bg-green-100 rounded-md hover:bg-green-200 transition-colors"
-                                                                    >
-                                                                        Approve
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleRejectAppointment(appointment._id)}
-                                                                        className="px-3 py-1 text-sm font-medium text-red-600 bg-red-100 rounded-md hover:bg-red-200 transition-colors"
-                                                                    >
-                                                                        Reject
-                                                                    </button>
-                                                                </div>
-                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -557,6 +688,198 @@ const DoctorDashboard = () => {
                                         <p className="mt-1 text-sm text-gray-500">Please contact your administrator to assign you to a hospital.</p>
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {activeTab === 'profile' && (
+                            <div>
+                                <div className="max-w-4xl mx-auto">
+                                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                                        <div className="p-6 border-b border-gray-200">
+                                            <h3 className="text-lg font-semibold text-gray-900">Update Doctor Profile</h3>
+                                            <p className="text-sm text-gray-600 mt-1">Update your professional information and availability</p>
+                                        </div>
+                                        <div className="p-6">
+                                            {locationError ? (
+                                                <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                                    <p className="text-yellow-800">
+                                                        {locationError}
+                                                    </p>
+                                                    <button
+                                                        onClick={() => window.location.reload()}
+                                                        className="mt-2 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+                                                    >
+                                                        Retry with Location
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="mb-6 flex items-center px-3 py-2 rounded-lg bg-green-50 border border-green-200">
+                                                    <svg className="w-4 h-4 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    </svg>
+                                                    <span className="text-green-800 text-sm">Location access granted</span>
+                                                </div>
+                                            )}
+
+                                            <form onSubmit={handleUpdateProfile} className="space-y-6">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                            Specialization *
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            name="specialization"
+                                                            value={editForm.specialization}
+                                                            onChange={handleInputChange}
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            placeholder="e.g., Cardiology, Pediatrics"
+                                                            required
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                            Years of Experience *
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            name="experience"
+                                                            value={editForm.experience}
+                                                            onChange={handleInputChange}
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            placeholder="5"
+                                                            min="0"
+                                                            required
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                            Consultation Fee (₹) *
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            name="consultationFee"
+                                                            value={editForm.consultationFee}
+                                                            onChange={handleInputChange}
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            placeholder="500"
+                                                            min="0"
+                                                            required
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                            Languages *
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            name="languages"
+                                                            value={editForm.languages.join(', ')}
+                                                            onChange={handleLanguageChange}
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            placeholder="English, Hindi, Spanish"
+                                                            required
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                        Address *
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        name="address"
+                                                        value={editForm.address}
+                                                        onChange={handleInputChange}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        placeholder="Your clinic address"
+                                                        required
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                        Bio
+                                                    </label>
+                                                    <textarea
+                                                        name="bio"
+                                                        value={editForm.bio}
+                                                        onChange={handleInputChange}
+                                                        rows="4"
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        placeholder="Tell us about your medical background and expertise..."
+                                                    />
+                                                </div>
+
+                                                {/* Availability Schedule */}
+                                                <div>
+                                                    <h4 className="text-lg font-medium text-gray-900 mb-4">Weekly Availability</h4>
+                                                    <div className="space-y-3">
+                                                        {editForm.availability.map((slot, index) => (
+                                                            <div key={index} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                                                                <div className="flex items-center space-x-2">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={slot.isAvailable}
+                                                                        onChange={() => toggleAvailability(index)}
+                                                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                                                    />
+                                                                    <span className="text-sm font-medium text-gray-700 w-20">
+                                                                        {slot.day}
+                                                                    </span>
+                                                                </div>
+                                                                
+                                                                {slot.isAvailable && (
+                                                                    <>
+                                                                        <input
+                                                                            type="time"
+                                                                            value={slot.startTime}
+                                                                            onChange={(e) => handleAvailabilityChange(index, 'startTime', e.target.value)}
+                                                                            className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                                                        />
+                                                                        <span className="text-gray-500">to</span>
+                                                                        <input
+                                                                            type="time"
+                                                                            value={slot.endTime}
+                                                                            onChange={(e) => handleAvailabilityChange(index, 'endTime', e.target.value)}
+                                                                            className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                                                        />
+                                                                    </>
+                                                                )}
+                                                                
+                                                                {!slot.isAvailable && (
+                                                                    <span className="text-sm text-gray-500">Not available</span>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex justify-end space-x-4 pt-6">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setActiveTab('overview')}
+                                                        className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        type="submit"
+                                                        disabled={updating || !location}
+                                                        className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+                                                    >
+                                                        {updating ? 'Updating...' : 'Update Profile'}
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
