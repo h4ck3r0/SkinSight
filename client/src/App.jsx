@@ -7,6 +7,7 @@ import PatientDashBroad from "./components/PatientDashBroad";
 import DoctorDashboard from "./components/DoctorDashboard";
 import HospitalDashborad from "./components/HospitalDashborad";
 import HospitalSelection from "./components/HospitalSelection";
+import ChatWidget from "./components/ChatWidget";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./ProtectedRoute";
 import SkinSightFeatures from "./components/features";
@@ -57,6 +58,7 @@ function App() {
                 }
               />
             </Routes>
+            <ChatWidget />
           </div>
         </Router>
       </SocketProvider>

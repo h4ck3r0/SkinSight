@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import axios from 'axios';
+import OpenAI from 'openai';
 import { SetupSocket } from './socket.js';
 import authRoutes from './routes/AuthRoutes.js';
 import doctorRoutes from './routes/DoctorRoutes.js';
@@ -20,33 +21,46 @@ console.log('Environment variables:', {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY
 });
 
-// OpenAI API configuration
-const API_BASE_URL = 'https://api.aimlapi.com/v1';
-const API_KEY = process.env.OPENAI_API_KEY;
-
-console.log('API Configuration:', {
-    API_BASE_URL,
-    API_KEY_EXISTS: !!API_KEY,
-    API_KEY_LENGTH: API_KEY ? API_KEY.length : 0
+// OpenAI client configuration
+const client = new OpenAI({
+    baseURL: "https://api.aimlapi.com/v1",
+    apiKey: process.env.OPENAI_API_KEY,
 });
 
-const callAPI = async (endpoint, data, headers = {}) => {
+console.log('OpenAI Client Configuration:', {
+    baseURL: client.baseURL,
+    apiKeyExists: !!process.env.OPENAI_API_KEY,
+    apiKeyLength: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 0
+});
+
+// OCR API function
+const callOcrAPI = async (imageUrl) => {
     try {
-        if (!API_KEY) {
+        if (!process.env.OPENAI_API_KEY) {
             throw new Error('OpenAI API key is not configured');
         }
         
-        const response = await axios.post(`${API_BASE_URL}${endpoint}`, data, {
+        const response = await axios.post('https://api.aimlapi.com/v1/ocr', {
+            model: "mistral/mistral-ocr-latest",
+            document: {
+                type: "document_url",
+                document_url: imageUrl
+            },
+            pages: "0",
+            include_image_base64: true,
+            image_limit: 1,
+            image_min_size: 1
+        }, {
             headers: {
-                'Authorization': `Bearer ${API_KEY}`,
+                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
                 'Content-Type': 'application/json',
-                'Accept': '*/*',
-                ...headers
+                'Accept': '*/*'
             }
         });
+        
         return response.data;
     } catch (error) {
-        console.error(`API Error (${endpoint}):`, error.response?.data || error.message);
+        console.error('OCR API Error:', error.response?.data || error.message);
         throw error;
     }
 };
@@ -57,7 +71,6 @@ const mockOcrResponse = (text) => ({
         page_number: 1
     }]
 });
-
 
 const app = express();
 const server = createServer(app);
@@ -91,14 +104,14 @@ apiRouter.post('/chat', async (req, res) => {
 
         console.log('Sending chat message:', message);
 
-        const apiResponse = await callAPI('/chat/completions', {
-            model: "gpt-3.5-turbo",
+        const response = await client.chat.completions.create({
+            model: "gpt-4o",
             messages: [
                 { role: "user", content: message }
             ]
         });
 
-        const responseText = apiResponse.choices?.[0]?.message?.content;
+        const responseText = response.choices[0].message.content;
         if (!responseText) {
             throw new Error('Invalid response from chat API');
         }
@@ -124,11 +137,13 @@ apiRouter.post('/analyze-image', async (req, res) => {
         }
 
         console.log('Processing image...');
-        const ocrResponse = mockOcrResponse();
-        const extractedText = ocrResponse.pages[0].text;
+        
+        // Use OCR API to extract text from image
+        const ocrResponse = await callOcrAPI(image);
+        const extractedText = ocrResponse.pages?.[0]?.text || 'No text extracted from image';
 
-        const analysisResponse = await callAPI('/chat/completions', {
-            model: "gpt-3.5-turbo",
+        const analysisResponse = await client.chat.completions.create({
+            model: "gpt-4o",
             messages: [
                 {
                     role: "system",
@@ -141,7 +156,7 @@ apiRouter.post('/analyze-image', async (req, res) => {
             ]
         });
 
-        const analysis = analysisResponse.choices?.[0]?.message?.content;
+        const analysis = analysisResponse.choices[0].message.content;
         if (!analysis) {
             throw new Error('Failed to analyze the medical text');
         }
