@@ -5,6 +5,7 @@ import QueueSystem from './QueueSystem';
 import Navigation from './Navigation';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 const DoctorDashboard = () => {
     const { user } = useAuth();
@@ -14,13 +15,22 @@ const DoctorDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [isSocketConnected, setIsSocketConnected] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
+    const navigate = useNavigate();
 
     useEffect(() => {
-        if (user?._id) {
-            fetchDoctorProfile();
-            fetchDoctorAppointments();
+        if (!user) {
+            navigate('/login');
+            return;
         }
-    }, [user]);
+
+        if (user.role !== 'doctor') {
+            navigate('/login');
+            return;
+        }
+
+        // Check if doctor profile exists
+        checkDoctorProfile();
+    }, [user, navigate]);
 
     // Socket connection and room joining
     useEffect(() => {
@@ -56,27 +66,29 @@ const DoctorDashboard = () => {
         }
     }, [socket, user?._id]);
 
-    const fetchDoctorProfile = async () => {
+    const checkDoctorProfile = async () => {
         try {
             setLoading(true);
             const API_URL = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com/api';
-            
             const response = await axios.get(`${API_URL}/doctors/profile`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 }
             });
             
-            setDoctorProfile(response.data.doctor);
-            console.log('Doctor profile fetched:', response.data.doctor);
+            if (response.data && response.data.doctor) {
+                setDoctorProfile(response.data.doctor.profile);
+                fetchDoctorAppointments();
+            }
         } catch (error) {
-            console.error('Error fetching doctor profile:', error);
-            toast.error('Failed to fetch doctor profile');
-            
-            // If it's an auth error, you might want to redirect to login
-            if (error.response?.status === 401) {
-                toast.error('Please login again');
-                // Add redirect to login if needed
+            if (error.response?.status === 404) {
+                // Doctor profile not found, redirect to profile setup
+                toast.error('Please complete your doctor profile first');
+                navigate('/doctor-profile-setup');
+                return;
+            } else {
+                console.error('Error checking doctor profile:', error);
+                toast.error('Failed to check doctor profile');
             }
         } finally {
             setLoading(false);

@@ -93,10 +93,18 @@ export async function updateHospital(req,res){
        const updatedhospital=await HospitalModel.findByIdAndUpdate({
         _id:hospitalId
        },{$set:data},{new:true}) 
-       res.status(200).json({message:"Hospital updated",updatedhospital
-       },{new:true}) 
+       
+       if (!updatedhospital) {
+           return res.status(404).json({ message: "Hospital not found" });
+       }
+       
+       res.status(200).json({
+           message: "Hospital updated successfully",
+           hospital: updatedhospital
+       });
      }catch(err){
-        res.status(500).json({message:err.message})
+        console.error("UpdateHospital error:", err);
+        res.status(500).json({message: err.message})
      }
 }
 //hospital-NN

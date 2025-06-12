@@ -2,21 +2,56 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { toast } from 'react-hot-toast';
+
+const API_URL = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com/api';
 
 export default function HospitalSelection() {
     const [hospitals, setHospitals] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [checkingProfile, setCheckingProfile] = useState(true);
     const navigate = useNavigate();
-    const { token } = useAuth();
+    const { token, user } = useAuth();
 
     useEffect(() => {
-        fetchHospitals();
+        checkDoctorProfile();
     }, []);
+
+    const checkDoctorProfile = async () => {
+        if (user?.role === 'doctor') {
+            try {
+                const response = await axios.get(`${API_URL}/doctors/profile`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                    }
+                });
+                
+                // If profile exists, fetch hospitals
+                if (response.data && response.data.doctor) {
+                    fetchHospitals();
+                }
+            } catch (error) {
+                if (error.response?.status === 404) {
+                    // Doctor profile not found, redirect to profile setup
+                    toast.error('Please complete your doctor profile first');
+                    navigate('/doctor-profile-setup');
+                    return;
+                } else {
+                    setError('Failed to check doctor profile');
+                    setCheckingProfile(false);
+                }
+            }
+        } else {
+            // For staff, directly fetch hospitals
+            fetchHospitals();
+        }
+    };
 
     const fetchHospitals = async () => {
         try {
-            const response = await axios.get('https://mycarebridge.onrender.com/api/hospital/getall');
+            setCheckingProfile(false);
+            const response = await axios.get(`${API_URL}/hospital/getall`);
             setHospitals(response.data.hospitals);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to fetch hospitals');
@@ -28,7 +63,7 @@ export default function HospitalSelection() {
     const joinHospital = async (hospitalId) => {
         try {
             const updateResponse = await axios.patch(
-                'https://mycarebridge.onrender.com/api/auth/updateHospital', 
+                `${API_URL}/auth/updateHospital`, 
                 { hospitalId },
                 {
                     headers: {
@@ -38,7 +73,7 @@ export default function HospitalSelection() {
                 }
             );
             const updatedUser = updateResponse.data.user;
-                localStorage.setItem('user', JSON.stringify(updatedUser));
+            localStorage.setItem('user', JSON.stringify(updatedUser));
             
             const role = updatedUser.role;
             
@@ -51,6 +86,14 @@ export default function HospitalSelection() {
             setError(err.response?.data?.message || 'Failed to join hospital');
         }
     };
+
+    if (checkingProfile) {
+        return (
+            <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+                <div className="text-xl">Checking profile...</div>
+            </div>
+        );
+    }
 
     if (loading) {
         return (

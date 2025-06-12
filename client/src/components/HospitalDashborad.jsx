@@ -6,18 +6,30 @@ import QueueSystem from "./QueueSystem";
 import Navigation from "./Navigation";
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import { useGeolocation } from '../hooks/useGeolocation';
 import { toast } from 'react-hot-toast';
+
+const API_URL = import.meta.env.VITE_API_URL || 'https://mycarebridge.onrender.com/api';
 
 export default function HospitalDashborad() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { socket } = useSocket();
+    const { location, error: locationError } = useGeolocation();
     const [hospital, setHospital] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('overview');
     const [queues, setQueues] = useState({});
     const [selectedDoctor, setSelectedDoctor] = useState(null);
+    const [updating, setUpdating] = useState(false);
+    const [editForm, setEditForm] = useState({
+        name: '',
+        address: '',
+        phone: '',
+        email: '',
+        service: []
+    });
 
     useEffect(() => {
         if (!user) {
@@ -64,7 +76,7 @@ export default function HospitalDashborad() {
 
         try {
             setLoading(true);
-            const response = await axios.get(`https://mycarebridge.onrender.com/api/hospital/${user.hospitalId}`, {
+            const response = await axios.get(`${API_URL}/hospital/${user.hospitalId}`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
@@ -76,6 +88,15 @@ export default function HospitalDashborad() {
                     hospitalData.doctors = [];
                 }
                 setHospital(hospitalData);
+                
+                // Initialize edit form with current data
+                setEditForm({
+                    name: hospitalData.name || '',
+                    address: hospitalData.address || '',
+                    phone: hospitalData.phone || '',
+                    email: hospitalData.email || '',
+                    service: hospitalData.service || []
+                });
             }
         } catch (err) {
             console.error("Error fetching hospital:", err);
@@ -96,6 +117,68 @@ export default function HospitalDashborad() {
             doctorId,
             hospitalId: user.hospitalId
         });
+    };
+
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setEditForm(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleServiceChange = (e) => {
+        const services = e.target.value.split(',').map(service => service.trim()).filter(service => service);
+        setEditForm(prev => ({
+            ...prev,
+            service: services
+        }));
+    };
+
+    const handleUpdateHospital = async (e) => {
+        e.preventDefault();
+        setUpdating(true);
+
+        try {
+            // Check if location is available for update
+            if (!location || !location.lat || !location.lng) {
+                toast.error('Please enable location access to update hospital details');
+                setUpdating(false);
+                return;
+            }
+
+            // Prepare location data
+            const locationData = {
+                type: 'Point',
+                coordinates: [parseFloat(location.lng), parseFloat(location.lat)]
+            };
+
+            const updateData = {
+                ...editForm,
+                location: locationData
+            };
+
+            const response = await axios.put(
+                `${API_URL}/hospital/${hospital._id}`,
+                updateData,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (response.data) {
+                toast.success('Hospital details updated successfully!');
+                await fetchHospital(); // Refresh hospital data
+            }
+        } catch (error) {
+            console.error('Error updating hospital:', error);
+            toast.error(error.response?.data?.message || 'Failed to update hospital details');
+        } finally {
+            setUpdating(false);
+        }
     };
 
     if (loading) {
@@ -148,7 +231,7 @@ export default function HospitalDashborad() {
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                             <div>
                                 <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                                    {hospital.name} 🏥
+                                    {hospital?.name || 'Hospital'} 🏥
                                 </h1>
                                 <p className="text-gray-600">
                                     Manage your hospital operations, doctors, and patient queues.
@@ -175,7 +258,7 @@ export default function HospitalDashborad() {
                             </div>
                             <div className="ml-4">
                                 <p className="text-sm font-medium text-gray-600">Total Doctors</p>
-                                <p className="text-2xl font-bold text-gray-900">{hospital.doctors?.length || 0}</p>
+                                <p className="text-2xl font-bold text-gray-900">{hospital?.doctors?.length || 0}</p>
                             </div>
                         </div>
                     </div>
@@ -203,7 +286,7 @@ export default function HospitalDashborad() {
                             </div>
                             <div className="ml-4">
                                 <p className="text-sm font-medium text-gray-600">Services</p>
-                                <p className="text-2xl font-bold text-gray-900">{hospital.service?.length || 0}</p>
+                                <p className="text-2xl font-bold text-gray-900">{hospital?.service?.length || 0}</p>
                             </div>
                         </div>
                     </div>
@@ -272,6 +355,22 @@ export default function HospitalDashborad() {
                                     <span>Queue Management</span>
                                 </div>
                             </button>
+                            <button
+                                onClick={() => setActiveTab('settings')}
+                                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                                    activeTab === 'settings'
+                                        ? 'border-blue-500 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                            >
+                                <div className="flex items-center space-x-2">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    <span>Hospital Settings</span>
+                                </div>
+                            </button>
                         </nav>
                     </div>
 
@@ -288,20 +387,20 @@ export default function HospitalDashborad() {
                                             <div className="space-y-4">
                                                 <div>
                                                     <label className="text-sm font-medium text-gray-600">Address</label>
-                                                    <p className="text-gray-900">{hospital.address}</p>
+                                                    <p className="text-gray-900">{hospital?.address}</p>
                                                 </div>
                                                 <div>
                                                     <label className="text-sm font-medium text-gray-600">Phone</label>
-                                                    <p className="text-gray-900">{hospital.phone}</p>
+                                                    <p className="text-gray-900">{hospital?.phone}</p>
                                                 </div>
                                                 <div>
                                                     <label className="text-sm font-medium text-gray-600">Email</label>
-                                                    <p className="text-gray-900">{hospital.email}</p>
+                                                    <p className="text-gray-900">{hospital?.email}</p>
                                                 </div>
                                                 <div>
                                                     <label className="text-sm font-medium text-gray-600">Services</label>
                                                     <div className="flex flex-wrap gap-2 mt-1">
-                                                        {hospital.service?.map((service, index) => (
+                                                        {hospital?.service?.map((service, index) => (
                                                             <span key={index} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                                                 {service}
                                                             </span>
@@ -350,7 +449,7 @@ export default function HospitalDashborad() {
                         {activeTab === 'doctors' && (
                             <div>
                                 <HospitalDoctors 
-                                    hospitalId={hospital._id} 
+                                    hospitalId={hospital?._id} 
                                     onDoctorAdded={handleDoctorAdded}
                                 />
                             </div>
@@ -358,7 +457,7 @@ export default function HospitalDashborad() {
 
                         {activeTab === 'queues' && (
                             <div>
-                                {hospital.doctors && hospital.doctors.length > 0 ? (
+                                {hospital?.doctors && hospital.doctors.length > 0 ? (
                                     <div className="space-y-6">
                                         <h3 className="text-lg font-semibold text-gray-900">Doctor Queues</h3>
                                         {hospital.doctors.map((doctor) => (
@@ -397,6 +496,140 @@ export default function HospitalDashborad() {
                                         <p className="mt-1 text-sm text-gray-500">Add doctors to start managing queues.</p>
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {activeTab === 'settings' && (
+                            <div>
+                                <div className="max-w-2xl mx-auto">
+                                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                                        <div className="p-6 border-b border-gray-200">
+                                            <h3 className="text-lg font-semibold text-gray-900">Update Hospital Information</h3>
+                                            <p className="text-sm text-gray-600 mt-1">Update your hospital details and location</p>
+                                        </div>
+                                        <div className="p-6">
+                                            {locationError ? (
+                                                <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                                    <p className="text-yellow-800">
+                                                        {locationError}
+                                                    </p>
+                                                    <button
+                                                        onClick={() => window.location.reload()}
+                                                        className="mt-2 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+                                                    >
+                                                        Retry with Location
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="mb-6 flex items-center px-3 py-2 rounded-lg bg-green-50 border border-green-200">
+                                                    <svg className="w-4 h-4 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    </svg>
+                                                    <span className="text-green-800 text-sm">Location access granted</span>
+                                                </div>
+                                            )}
+
+                                            <form onSubmit={handleUpdateHospital} className="space-y-6">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                        Hospital Name *
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        name="name"
+                                                        value={editForm.name}
+                                                        onChange={handleInputChange}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        placeholder="Hospital Name"
+                                                        required
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                        Address *
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        name="address"
+                                                        value={editForm.address}
+                                                        onChange={handleInputChange}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        placeholder="Hospital Address"
+                                                        required
+                                                    />
+                                                </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                            Phone Number *
+                                                        </label>
+                                                        <input
+                                                            type="tel"
+                                                            name="phone"
+                                                            value={editForm.phone}
+                                                            onChange={handleInputChange}
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            placeholder="Phone Number"
+                                                            required
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                            Email *
+                                                        </label>
+                                                        <input
+                                                            type="email"
+                                                            name="email"
+                                                            value={editForm.email}
+                                                            onChange={handleInputChange}
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            placeholder="hospital@example.com"
+                                                            required
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                        Services (comma-separated)
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        name="service"
+                                                        value={editForm.service.join(', ')}
+                                                        onChange={handleServiceChange}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        placeholder="Cardiology, Pediatrics, Emergency Care"
+                                                    />
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                        Enter services separated by commas
+                                                    </p>
+                                                </div>
+
+                                                <div className="flex justify-end space-x-4 pt-6">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setActiveTab('overview')}
+                                                        className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        type="submit"
+                                                        disabled={updating || !location}
+                                                        className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+                                                    >
+                                                        {updating ? 'Updating...' : 'Update Hospital'}
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
