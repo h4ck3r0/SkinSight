@@ -15,6 +15,7 @@ const DoctorDashboard = () => {
     const { socket } = useSocket();
     const { location, error: locationError } = useGeolocation();
     const [doctorProfile, setDoctorProfile] = useState(null);
+    const [hospitalInfo, setHospitalInfo] = useState(null);
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isSocketConnected, setIsSocketConnected] = useState(false);
@@ -61,6 +62,24 @@ const DoctorDashboard = () => {
         ]
     });
     const navigate = useNavigate();
+
+    // Helper function to get doctor's full name
+    const getDoctorName = () => {
+        if (doctorProfile?.user?.firstName && doctorProfile?.user?.lastName) {
+            return `${doctorProfile.user.firstName} ${doctorProfile.user.lastName}`;
+        } else if (user?.firstName && user?.lastName) {
+            return `${user.firstName} ${user.lastName}`;
+        } else if (user?.firstName) {
+            return user.firstName;
+        } else {
+            return 'Doctor';
+        }
+    };
+
+    // Helper function to get doctor profile data
+    const getDoctorProfileData = () => {
+        return doctorProfile?.profile || doctorProfile || {};
+    };
 
     useEffect(() => {
         if (!user) {
@@ -112,15 +131,32 @@ const DoctorDashboard = () => {
             if (response.data && response.data.doctor) {
                 setDoctorProfile(response.data.doctor);
                 
-                // Initialize edit form with current data
+                // Fetch hospital information if user has hospitalId
+                if (response.data.doctor.user && response.data.doctor.user.hospitalId) {
+                    try {
+                        const hospitalResponse = await axios.get(`${API_URL}/hospital/${response.data.doctor.user.hospitalId}`, {
+                            headers: {
+                                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                            }
+                        });
+                        if (hospitalResponse.data && hospitalResponse.data.hospital) {
+                            setHospitalInfo(hospitalResponse.data.hospital);
+                        }
+                    } catch (hospitalError) {
+                        console.error('Error fetching hospital info:', hospitalError);
+                    }
+                }
+                
+                // Initialize edit form with current data from profile
+                const profileData = response.data.doctor.profile || response.data.doctor;
                 setEditForm({
-                    specialization: response.data.doctor.specialization || '',
-                    experience: response.data.doctor.experience || '',
-                    consultationFee: response.data.doctor.consultationFee || '',
-                    bio: response.data.doctor.bio || '',
-                    address: response.data.doctor.address || '',
-                    languages: response.data.doctor.languages || ['English'],
-                    availability: response.data.doctor.availability || [
+                    specialization: profileData.specialization || '',
+                    experience: profileData.experience || '',
+                    consultationFee: profileData.consultationFee || '',
+                    bio: profileData.bio || '',
+                    address: profileData.address || '',
+                    languages: profileData.languages || ['English'],
+                    availability: profileData.availability || [
                         {
                             day: 'Monday',
                             startTime: '09:00',
@@ -188,11 +224,11 @@ const DoctorDashboard = () => {
     const handleApproveAppointment = async (appointmentId) => {
         try {
             const response = await axios.put(`${API_URL}/doctors/appointments/${appointmentId}/approve`, {
-                approvalStatus: 'approved'
+                approvalStatus: 'approved',
+                approvalMessage: 'Appointment approved by doctor'
             }, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
             });
 
@@ -202,18 +238,18 @@ const DoctorDashboard = () => {
             }
         } catch (error) {
             console.error('Error approving appointment:', error);
-            toast.error('Failed to approve appointment');
+            toast.error(error.response?.data?.message || 'Failed to approve appointment');
         }
     };
 
     const handleRejectAppointment = async (appointmentId) => {
         try {
             const response = await axios.put(`${API_URL}/doctors/appointments/${appointmentId}/approve`, {
-                approvalStatus: 'rejected'
+                approvalStatus: 'rejected',
+                approvalMessage: 'Appointment rejected by doctor'
             }, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
             });
 
@@ -223,7 +259,7 @@ const DoctorDashboard = () => {
             }
         } catch (error) {
             console.error('Error rejecting appointment:', error);
-            toast.error('Failed to reject appointment');
+            toast.error(error.response?.data?.message || 'Failed to reject appointment');
         }
     };
 
@@ -375,11 +411,47 @@ const DoctorDashboard = () => {
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                             <div>
                                 <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                                    Welcome, Dr. {doctorProfile?.name || user?.name || 'Doctor'}! 👨‍⚕️
+                                    Welcome, Dr. {getDoctorName()}! 👨‍⚕️
                                 </h1>
-                                <p className="text-gray-600">
+                                <p className="text-gray-600 mb-2">
                                     Manage your appointments, patient queues, and consultations.
                                 </p>
+                                {hospitalInfo ? (
+                                    <div className="text-sm text-blue-600 font-medium">
+                                        <p>🏥 {hospitalInfo.name}</p>
+                                        <p className="text-gray-600">{hospitalInfo.address}</p>
+                                        {hospitalInfo.phone && (
+                                            <p className="text-gray-600">📞 {hospitalInfo.phone}</p>
+                                        )}
+                                        {hospitalInfo.email && (
+                                            <p className="text-gray-600">✉️ {hospitalInfo.email}</p>
+                                        )}
+                                    </div>
+                                ) : doctorProfile?.user?.hospitalId ? (
+                                    <p className="text-sm text-gray-500">
+                                        🏥 Loading hospital information...
+                                    </p>
+                                ) : null}
+                                {getDoctorProfileData().specialization && (
+                                    <p className="text-sm text-gray-500">
+                                        Specialization: {getDoctorProfileData().specialization}
+                                    </p>
+                                )}
+                                {getDoctorProfileData().experience && (
+                                    <p className="text-sm text-gray-500">
+                                        Experience: {getDoctorProfileData().experience} years
+                                    </p>
+                                )}
+                                {getDoctorProfileData().consultationFee && (
+                                    <p className="text-sm text-gray-500">
+                                        Consultation Fee: ₹{getDoctorProfileData().consultationFee}
+                                    </p>
+                                )}
+                                {getDoctorProfileData().languages && getDoctorProfileData().languages.length > 0 && (
+                                    <p className="text-sm text-gray-500">
+                                        Languages: {getDoctorProfileData().languages.join(', ')}
+                                    </p>
+                                )}
                             </div>
                             <div className="mt-4 md:mt-0">
                                 <div className="flex items-center space-x-2 text-sm text-gray-500">
@@ -453,7 +525,7 @@ const DoctorDashboard = () => {
                 </div>
                 <div className="bg-white rounded-xl shadow-lg border border-gray-100 mb-8">
                     <div className="border-b border-gray-200">
-                        <nav className="flex justify-around sm:justify-start sm:space-x-8 px-4 sm:px-6" aria-label="Tabs">
+                        <nav className="flex space-x-8 px-6" aria-label="Tabs">
                             <button
                                 onClick={() => setActiveTab('overview')}
                                 className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
@@ -462,11 +534,11 @@ const DoctorDashboard = () => {
                                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                             >
-                                <div className="flex items-center" title="Overview">
-                                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div className="flex items-center space-x-2">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                                     </svg>
-                                    <span className="hidden sm:block ml-2">Overview</span>
+                                    <span>Overview</span>
                                 </div>
                             </button>
                             <button
@@ -477,11 +549,11 @@ const DoctorDashboard = () => {
                                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                             >
-                                <div className="flex items-center" title="Appointments">
-                                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div className="flex items-center space-x-2">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                     </svg>
-                                    <span className="hidden sm:block ml-2">Appointments</span>
+                                    <span>Appointments</span>
                                 </div>
                             </button>
                             <button
@@ -492,11 +564,11 @@ const DoctorDashboard = () => {
                                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                             >
-                                <div className="flex items-center" title="Queue Management">
-                                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div className="flex items-center space-x-2">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                                     </svg>
-                                    <span className="hidden sm:block ml-2">Queue</span>
+                                    <span>Queue Management</span>
                                 </div>
                             </button>
                             <button
@@ -507,11 +579,11 @@ const DoctorDashboard = () => {
                                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                             >
-                                <div className="flex items-center" title="Profile">
-                                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div className="flex items-center space-x-2">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                     </svg>
-                                    <span className="hidden sm:block ml-2">Profile</span>
+                                    <span>Profile</span>
                                 </div>
                             </button>
                         </nav>
