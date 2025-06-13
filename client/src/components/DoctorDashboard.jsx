@@ -187,9 +187,12 @@ const DoctorDashboard = () => {
 
     const handleApproveAppointment = async (appointmentId) => {
         try {
-            const response = await axios.put(`${API_URL}/doctors/approve-appointment/${appointmentId}`, {}, {
+            const response = await axios.put(`${API_URL}/doctors/appointments/${appointmentId}/approve`, {
+                approvalStatus: 'approved'
+            }, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
                 }
             });
 
@@ -205,9 +208,12 @@ const DoctorDashboard = () => {
 
     const handleRejectAppointment = async (appointmentId) => {
         try {
-            const response = await axios.put(`${API_URL}/doctors/reject-appointment/${appointmentId}`, {}, {
+            const response = await axios.put(`${API_URL}/doctors/appointments/${appointmentId}/approve`, {
+                approvalStatus: 'rejected'
+            }, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
                 }
             });
 
