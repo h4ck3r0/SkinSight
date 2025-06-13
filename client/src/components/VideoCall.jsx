@@ -18,11 +18,14 @@ const VideoCall = ({
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
     const [mediaError, setMediaError] = useState(null);
+    const [connectionRetries, setConnectionRetries] = useState(0);
+    const [maxRetries] = useState(3);
     
     const localVideoRef = useRef();
     const remoteVideoRef = useRef();
     const peerRef = useRef();
     const localStreamRef = useRef();
+    const retryTimeoutRef = useRef();
 
     // Initialize local stream when component becomes active
     useEffect(() => {
@@ -72,19 +75,34 @@ const VideoCall = ({
     }, [remoteStream]);
 
     const cleanup = () => {
+        if (retryTimeoutRef.current) {
+            clearTimeout(retryTimeoutRef.current);
+            retryTimeoutRef.current = null;
+        }
+        
         if (localStreamRef.current) {
-            localStreamRef.current.getTracks().forEach(track => track.stop());
+            localStreamRef.current.getTracks().forEach(track => {
+                track.stop();
+                console.log('Stopped track:', track.kind);
+            });
             localStreamRef.current = null;
         }
+        
         if (peerRef.current) {
-            peerRef.current.destroy();
+            try {
+                peerRef.current.destroy();
+            } catch (error) {
+                console.warn('Error destroying peer:', error);
+            }
             peerRef.current = null;
         }
+        
         setLocalStream(null);
         setRemoteStream(null);
         setIsConnected(false);
         setIsConnecting(false);
         setMediaError(null);
+        setConnectionRetries(0);
     };
 
     const startLocalStream = async () => {
@@ -98,8 +116,16 @@ const VideoCall = ({
             console.log('Requesting media access...');
             
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: true,
-                audio: true
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    frameRate: { ideal: 30 }
+                },
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
             });
             
             setLocalStream(stream);
@@ -114,7 +140,11 @@ const VideoCall = ({
             // Try audio-only as fallback
             try {
                 const audioStream = await navigator.mediaDevices.getUserMedia({
-                    audio: true,
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    },
                     video: false
                 });
                 
@@ -133,72 +163,149 @@ const VideoCall = ({
     const createPeer = (initiator) => {
         if (!Peer || !remoteUserId) return;
 
-        console.log('Creating peer connection...');
+        console.log('Creating peer connection...', { initiator, connectionRetries });
 
         const peerConfig = {
             initiator,
-            trickle: false
+            trickle: true,
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:stun3.l.google.com:19302' },
+                    { urls: 'stun:stun4.l.google.com:19302' }
+                ],
+                iceCandidatePoolSize: 10
+            },
+            offerOptions: {
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: true
+            }
         };
 
         if (localStream) {
             peerConfig.stream = localStream;
         }
 
-        const peer = new Peer(peerConfig);
+        try {
+            const peer = new Peer(peerConfig);
 
-        peer.on('signal', (data) => {
-            if (peerRef.current && peerRef.current === peer) {
-                socket.emit('videoCallSignal', {
-                    signal: data,
-                    from: localUserId,
-                    to: remoteUserId
-                });
+            peer.on('signal', (data) => {
+                if (peerRef.current && peerRef.current === peer) {
+                    console.log('Sending signal to remote peer');
+                    socket.emit('videoCallSignal', {
+                        signal: data,
+                        from: localUserId,
+                        to: remoteUserId
+                    });
+                }
+            });
+
+            peer.on('stream', (stream) => {
+                console.log('Received remote stream with tracks:', stream.getTracks().map(t => t.kind));
+                setRemoteStream(stream);
+                setIsConnected(true);
+                setIsConnecting(false);
+                setConnectionRetries(0);
+                toast.success('Call connected!');
+            });
+
+            peer.on('connect', () => {
+                console.log('Peer connection established');
+                setIsConnected(true);
+                setIsConnecting(false);
+                setConnectionRetries(0);
+                toast.success('Call connected!');
+            });
+
+            peer.on('error', (error) => {
+                console.error('Peer error:', error);
+                
+                // Handle specific error types
+                if (error.code === 'ERR_CONNECTION_FAILED' || error.message.includes('Connection failed')) {
+                    handleConnectionFailure();
+                } else {
+                    toast.error('Connection error: ' + error.message);
+                    setIsConnecting(false);
+                }
+            });
+
+            peer.on('close', () => {
+                console.log('Peer connection closed');
+                setIsConnected(false);
+                setIsConnecting(false);
+            });
+
+            peer.on('iceStateChange', (state) => {
+                console.log('ICE connection state:', state);
+                if (state === 'failed') {
+                    handleConnectionFailure();
+                }
+            });
+
+            peerRef.current = peer;
+            setIsConnecting(true);
+            
+        } catch (error) {
+            console.error('Error creating peer:', error);
+            toast.error('Failed to create connection');
+            setIsConnecting(false);
+        }
+    };
+
+    const handleConnectionFailure = () => {
+        console.log('Connection failed, retry attempt:', connectionRetries + 1);
+        
+        if (connectionRetries < maxRetries) {
+            setConnectionRetries(prev => prev + 1);
+            toast.info(`Connection failed. Retrying... (${connectionRetries + 1}/${maxRetries})`);
+            
+            // Clean up current peer
+            if (peerRef.current) {
+                try {
+                    peerRef.current.destroy();
+                } catch (error) {
+                    console.warn('Error destroying peer during retry:', error);
+                }
+                peerRef.current = null;
             }
-        });
-
-        peer.on('stream', (stream) => {
-            console.log('Received remote stream with tracks:', stream.getTracks().map(t => t.kind));
-            setRemoteStream(stream);
-            setIsConnected(true);
+            
+            // Retry after a delay
+            retryTimeoutRef.current = setTimeout(() => {
+                if (isActive && localStream && remoteUserId && Peer) {
+                    createPeer(isInitiator);
+                }
+            }, 2000 * (connectionRetries + 1)); // Exponential backoff
+            
+        } else {
+            toast.error('Failed to establish connection after multiple attempts');
             setIsConnecting(false);
-        });
-
-        peer.on('connect', () => {
-            console.log('Peer connection established');
-            setIsConnected(true);
-            setIsConnecting(false);
-            toast.success('Call connected!');
-        });
-
-        peer.on('error', (error) => {
-            console.error('Peer error:', error);
-            toast.error('Connection error: ' + error.message);
-            setIsConnecting(false);
-        });
-
-        peer.on('close', () => {
-            console.log('Peer connection closed');
-            setIsConnected(false);
-            setIsConnecting(false);
-        });
-
-        peerRef.current = peer;
-        setIsConnecting(true);
+            setConnectionRetries(0);
+        }
     };
 
     const handleSignal = (signal) => {
         if (!peerRef.current) {
+            console.log('Creating peer for incoming signal');
             createPeer(false);
             setTimeout(() => {
                 if (peerRef.current) {
-                    peerRef.current.signal(signal);
+                    try {
+                        peerRef.current.signal(signal);
+                    } catch (error) {
+                        console.error('Error signaling peer:', error);
+                        handleConnectionFailure();
+                    }
                 }
-            }, 200);
+            }, 500); // Increased delay for better reliability
         } else {
             try {
+                console.log('Signaling existing peer');
                 peerRef.current.signal(signal);
             } catch (error) {
                 console.error('Error signaling peer:', error);
+                handleConnectionFailure();
             }
         }
     };
@@ -227,6 +334,31 @@ const VideoCall = ({
                 setIsVideoOff(!videoTrack.enabled);
                 toast(videoTrack.enabled ? 'Camera turned on' : 'Camera turned off');
             }
+        }
+    };
+
+    const retryConnection = () => {
+        if (retryTimeoutRef.current) {
+            clearTimeout(retryTimeoutRef.current);
+            retryTimeoutRef.current = null;
+        }
+        
+        if (peerRef.current) {
+            try {
+                peerRef.current.destroy();
+            } catch (error) {
+                console.warn('Error destroying peer during manual retry:', error);
+            }
+            peerRef.current = null;
+        }
+        
+        setConnectionRetries(0);
+        setIsConnecting(false);
+        setIsConnected(false);
+        
+        // Retry connection
+        if (localStream && remoteUserId && Peer) {
+            createPeer(isInitiator);
         }
     };
 
@@ -315,13 +447,22 @@ const VideoCall = ({
                         {isConnecting && (
                             <div className="flex items-center gap-2">
                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                                <span className="text-sm text-gray-600">Connecting...</span>
+                                <span className="text-sm text-gray-600">
+                                    Connecting...
+                                    {connectionRetries > 0 && ` (Retry ${connectionRetries}/${maxRetries})`}
+                                </span>
                             </div>
                         )}
                         {isConnected && (
                             <div className="flex items-center gap-2">
                                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                                 <span className="text-sm text-green-600">Connected</span>
+                            </div>
+                        )}
+                        {!isConnecting && !isConnected && localStream && (
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                                <span className="text-sm text-yellow-600">Ready to connect</span>
                             </div>
                         )}
                     </div>
@@ -331,7 +472,8 @@ const VideoCall = ({
                 <div className="mb-2 text-xs text-gray-500">
                     Local Stream: {localStream ? '✅' : '❌'} | 
                     Remote Stream: {remoteStream ? '✅' : '❌'} | 
-                    Connected: {isConnected ? '✅' : '❌'}
+                    Connected: {isConnected ? '✅' : '❌'} |
+                    Retries: {connectionRetries}/{maxRetries}
                 </div>
 
                 {/* Media Error Display */}
@@ -457,6 +599,17 @@ const VideoCall = ({
                             )}
                         </>
                     )}
+                    
+                    {/* Manual retry button when connection fails */}
+                    {!isConnected && !isConnecting && localStream && connectionRetries >= maxRetries && (
+                        <button
+                            onClick={retryConnection}
+                            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                        >
+                            Retry Connection
+                        </button>
+                    )}
+                    
                     <button
                         onClick={handleEndCall}
                         className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
