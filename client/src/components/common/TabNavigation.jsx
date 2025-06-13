@@ -5,7 +5,6 @@ const TabNavigation = ({ tabs, activeTab, onTabChange }) => {
 
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 mb-8">
-      {/* Desktop Navigation */}
       <div className="hidden sm:block border-b border-gray-200">
         <nav className="flex space-x-8 px-6" aria-label="Tabs">
           {tabs.map((tab) => (
