@@ -359,7 +359,7 @@ const PatientDashBroad = () => {
                 </div>
 
                 {/* Quick Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
                         <div className="flex items-center">
                             <div className="p-3 bg-blue-100 rounded-lg">
@@ -400,6 +400,24 @@ const PatientDashBroad = () => {
                                 <p className="text-2xl font-bold text-gray-900">
                                     {Object.values(doctorsMap).flat().length}
                                 </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Add Skin Analyzer Card */}
+                    <div
+                        onClick={() => navigate('/ml')}
+                        className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 cursor-pointer transition-all hover:shadow-xl hover:scale-[1.02]"
+                    >
+                        <div className="flex items-center">
+                            <div className="p-3 bg-purple-100 rounded-lg">
+                                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                </svg>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-medium text-gray-600">Skin Analyzer</p>
+                                <p className="text-sm text-gray-500">AI-powered skin analysis</p>
                             </div>
                         </div>
                     </div>
