@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![SkinSight Logo](https://img.shields.io/badge/SkinSight-Healthcare%20AI-blue?style=for-the-badge&logo=medical)
+![SkinSight Logo](https://img.shields.io/badge/SkinSight-Healthcare%20AI-blue?style=for-the-badge&logo=medical)(https://skinsight.netlify.app)
 
 **Revolutionizing healthcare with AI-powered skin analysis, intelligent chat assistance, and comprehensive hospital management**
 
