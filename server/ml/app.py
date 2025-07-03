@@ -13,7 +13,7 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)  # Allow all origins
 
-# Load model and class names
+
 try:
     with open('class_names.pkl', 'rb') as f:
         class_names = pickle.load(f)
@@ -25,13 +25,13 @@ try:
     model.to(device)
     model.eval()
 
-    print("✅ Model loaded successfully!")
+    print("Model loaded successfully!")
 except Exception as e:
-    print(f"❌ Error loading model: {str(e)}")
+    print(f"Error loading model: {str(e)}")
     model = None
     class_names = []
 
-# Image transform
+
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
