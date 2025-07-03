@@ -1,5 +1,5 @@
 import os
-os.environ['NUMPY_EXPERIMENTAL_ARRAY_FUNCTION'] = '0'  # Fix for NumPy issue
+os.environ['NUMPY_EXPERIMENTAL_ARRAY_FUNCTION'] = '0'  
 
 import torch
 import torch.nn as nn
@@ -11,7 +11,7 @@ import pickle
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)  # Allow all origins
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)  
 
 
 try:
